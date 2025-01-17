@@ -71,7 +71,7 @@ def lancar_despesas():
                 salvar_em_excel("Despesa", categoria, valor_gv, inquilino, observacoes, divida_percentual_1, "GV")  # Salvar para o GV
                 salvar_em_excel("Despesa", categoria, valor_jlp, inquilino, observacoes, divida_percentual_2, "JLP")  # Salvar para o JLP
             else:
-                salvar_em_excel("Receita", categoria, valor_float, observacoes=observacoes, divida_porcentagem=None, predio_destino=prédio_selecionado)  # Salvar para o JLP
+               salvar_em_excel("Despesa", categoria, valor_float, inquilino, observacoes, None, prédio_selecionado)
             label_status.configure(text=f"Despesa '{categoria}' de R${valor} salva!", text_color="green")
             campo_valor.delete(0, ctk.END)
             campo_inquilino.delete(0, ctk.END)
@@ -165,8 +165,8 @@ def lancar_receitas():
                 salvar_em_excel("Receita", categoria, valor_gv, observacoes=observacoes, divida_porcentagem=divida_percentual_1, predio_destino="GV")  # Salvar para o GV
                 salvar_em_excel("Receita", categoria, valor_jlp, observacoes=observacoes, divida_porcentagem=divida_percentual_2, predio_destino="JLP")  # Salvar para o JLP
             else:
-                salvar_em_excel("Receita", categoria, valor_float, observacoes=observacoes, divida_porcentagem=None, predio_destino="GV")  # Salvar para o GV
-                salvar_em_excel("Receita", categoria, valor_float, observacoes=observacoes, divida_porcentagem=None, predio_destino="JLP")  # Salvar para o JLP
+                salvar_em_excel("Receita", categoria, valor_float, observacoes=observacoes, predio_destino=prédio_selecionado)
+
 
             label_status.configure(text=f"Receita '{categoria}' de R${valor} salva!", text_color="green")
             campo_valor.delete(0, ctk.END)
