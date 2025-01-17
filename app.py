@@ -71,8 +71,7 @@ def lancar_despesas():
                 salvar_em_excel("Despesa", categoria, valor_gv, inquilino, observacoes, divida_percentual_1, "GV")  # Salvar para o GV
                 salvar_em_excel("Despesa", categoria, valor_jlp, inquilino, observacoes, divida_percentual_2, "JLP")  # Salvar para o JLP
             else:
-                salvar_em_excel("Despesa", categoria, valor_float, inquilino, observacoes, None, "GV")  # Salvar para o GV
-                salvar_em_excel("Despesa", categoria, valor_float, inquilino, observacoes, None, "JLP")  # Salvar para o JLP
+                salvar_em_excel("Receita", categoria, valor_float, observacoes=observacoes, divida_porcentagem=None, predio_destino=prédio_selecionado)  # Salvar para o JLP
             label_status.configure(text=f"Despesa '{categoria}' de R${valor} salva!", text_color="green")
             campo_valor.delete(0, ctk.END)
             campo_inquilino.delete(0, ctk.END)
@@ -219,6 +218,8 @@ def lancar_receitas():
     
     label_status = ctk.CTkLabel(janela_receitas, text="", font=("Arial", 12))
     label_status.pack(pady=5)
+
+
 
 # Função para selecionar o prédio
 def selecionar_predio(predio):
