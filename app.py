@@ -12,7 +12,7 @@ root = ctk.CTk()
 root.title("Gerenciador Financeiro")
 root.geometry("600x400")
 
-# Categorias de despesas e receitas (corrigido)
+# Categorias de despesas e receitas
 categorias_receitas = ["ALUGUÉIS", "APLICAÇÕES FINANCEIRAS"]  # Agora são receitas
 categorias_despesas = [
     "SERVIÇOS", "TARIFAS", "VIAGENS", "MOBILIÁRIO", "EQUIPAMENTOS", 
@@ -25,7 +25,7 @@ categorias_despesas = [
 prédio_selecionado = ""
 
 # Função para salvar os dados na planilha Excel
-def salvar_em_excel(tipo, categoria, valor):
+def salvar_em_excel(tipo, categoria, valor, inquilino=None, observacoes=None):
     global prédio_selecionado
     if not prédio_selecionado:
         return
@@ -34,9 +34,9 @@ def salvar_em_excel(tipo, categoria, valor):
     mes_atual = datetime.now().strftime("%Y-%m")
     nome_arquivo = f"{prédio_selecionado}_{mes_atual}.xlsx"
     
-    # Criar DataFrame com os novos dados
-    novo_dado = pd.DataFrame([[tipo, categoria, float(valor), datetime.now().strftime("%d/%m/%Y")]], 
-                             columns=["Tipo", "Categoria", "Valor", "Data"])
+    # Adicionar as observações e inquilino, se houver
+    novo_dado = pd.DataFrame([[tipo, categoria, float(valor), inquilino, observacoes, datetime.now().strftime("%d/%m/%Y")]], 
+                             columns=["Tipo", "Categoria", "Valor", "Inquilino", "Observações", "Data"])
 
     # Verificar se o arquivo já existe
     if os.path.exists(nome_arquivo):
@@ -54,16 +54,23 @@ def lancar_despesas():
     def salvar_despesa():
         categoria = combo_categorias.get()
         valor = campo_valor.get()
+        observacoes = campo_observacoes.get()
+        
+        # Se a categoria for "ALUGUEL", incluir o inquilino
+        inquilino = campo_inquilino.get() if var_inquilino.get() else None
+        
         if categoria and valor.strip():
-            salvar_em_excel("Despesa", categoria, valor)
+            salvar_em_excel("Despesa", categoria, valor, inquilino, observacoes)
             label_status.configure(text=f"Despesa '{categoria}' de R${valor} salva!", text_color="green")
             campo_valor.delete(0, ctk.END)
+            campo_inquilino.delete(0, ctk.END)
+            campo_observacoes.delete(0, ctk.END)
         else:
             label_status.configure(text="Por favor, preencha todos os campos.", text_color="red")
 
     janela_despesas = ctk.CTkToplevel(root)
     janela_despesas.title(f"Lançar Despesas - {prédio_selecionado}")
-    janela_despesas.geometry("500x300")
+    janela_despesas.geometry("500x350")
 
     ctk.CTkLabel(janela_despesas, text="Lançar Despesas", font=("Arial", 18, "bold")).pack(pady=10)
     ctk.CTkLabel(janela_despesas, text="Selecione a categoria:", font=("Arial", 14)).pack(pady=10)
@@ -74,6 +81,34 @@ def lancar_despesas():
     ctk.CTkLabel(janela_despesas, text="Insira o valor:", font=("Arial", 14)).pack(pady=10)
     campo_valor = ctk.CTkEntry(janela_despesas, placeholder_text="Ex: 150.00", width=200)
     campo_valor.pack(pady=10)
+    
+    # Checkbox para inquilino e campo de entrada
+    var_inquilino = ctk.BooleanVar(value=False)
+    
+    check_inquilino = ctk.CTkCheckBox(janela_despesas, text="Descrição do Inquilino", variable=var_inquilino, onvalue=True, offvalue=False)
+    campo_inquilino = ctk.CTkEntry(janela_despesas, placeholder_text="Nome do Inquilino", width=200)
+
+    ctk.CTkLabel(janela_despesas, text="Observações (opcional):", font=("Arial", 14)).pack(pady=10)
+    campo_observacoes = ctk.CTkEntry(janela_despesas, placeholder_text="Observações", width=200)
+    campo_observacoes.pack(pady=10)
+
+    # Função que vai verificar a categoria e mostrar/ocultar o campo inquilino
+    def toggle_inquilino(event=None):
+        print(f"Categoria selecionada: {combo_categorias.get()}")  # Depuração
+        if combo_categorias.get() == "ALUGUÉIS":
+            print("Categoria 'ALUGUÉIS' selecionada. Exibindo campo Inquilino.")  # Depuração
+            check_inquilino.pack(pady=10)
+            campo_inquilino.pack(pady=5)
+        else:
+            print("Categoria diferente de 'ALUGUÉIS'. Ocultando campo Inquilino.")  # Depuração
+            check_inquilino.pack_forget()
+            campo_inquilino.pack_forget()
+
+    # Adicionar o evento para atualizar quando a categoria for alterada
+    combo_categorias.bind("<<ComboboxSelected>>", toggle_inquilino)
+    
+    # Inicializar a visibilidade do campo inquilino ao abrir a janela
+    toggle_inquilino()
 
     ctk.CTkButton(janela_despesas, text="Salvar", command=salvar_despesa).pack(pady=10)
     
@@ -85,10 +120,13 @@ def lancar_receitas():
     def salvar_receita():
         categoria = combo_categorias.get()
         valor = campo_valor.get()
+        observacoes = campo_observacoes.get()
+        
         if categoria and valor.strip():
-            salvar_em_excel("Receita", categoria, valor)
+            salvar_em_excel("Receita", categoria, valor, observacoes=observacoes)
             label_status.configure(text=f"Receita '{categoria}' de R${valor} salva!", text_color="green")
             campo_valor.delete(0, ctk.END)
+            campo_observacoes.delete(0, ctk.END)
         else:
             label_status.configure(text="Por favor, preencha todos os campos.", text_color="red")
 
@@ -105,6 +143,10 @@ def lancar_receitas():
     ctk.CTkLabel(janela_receitas, text="Insira o valor:", font=("Arial", 14)).pack(pady=10)
     campo_valor = ctk.CTkEntry(janela_receitas, placeholder_text="Ex: 500.00", width=200)
     campo_valor.pack(pady=10)
+
+    ctk.CTkLabel(janela_receitas, text="Observações (opcional):", font=("Arial", 14)).pack(pady=10)
+    campo_observacoes = ctk.CTkEntry(janela_receitas, placeholder_text="Observações", width=200)
+    campo_observacoes.pack(pady=10)
 
     ctk.CTkButton(janela_receitas, text="Salvar", command=salvar_receita).pack(pady=10)
     
