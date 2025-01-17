@@ -25,18 +25,18 @@ categorias_despesas = [
 prédio_selecionado = ""
 
 # Função para salvar os dados na planilha Excel
-def salvar_em_excel(tipo, categoria, valor, inquilino=None, observacoes=None):
+def salvar_em_excel(tipo, categoria, valor, inquilino=None, observacoes=None, divida_porcentagem=None, predio_destino=None):
     global prédio_selecionado
     if not prédio_selecionado:
         return
     
-    # Criar nome do arquivo Excel
+    # Criar nome do arquivo Excel para o prédio de destino
     mes_atual = datetime.now().strftime("%Y-%m")
-    nome_arquivo = f"{prédio_selecionado}_{mes_atual}.xlsx"
+    nome_arquivo = f"{predio_destino}_{mes_atual}.xlsx"
     
-    # Adicionar as observações e inquilino, se houver
-    novo_dado = pd.DataFrame([[tipo, categoria, float(valor), inquilino, observacoes, datetime.now().strftime("%d/%m/%Y")]], 
-                             columns=["Tipo", "Categoria", "Valor", "Inquilino", "Observações", "Data"])
+    # Adicionar as observações, inquilino e percentual de divisão, se houver
+    novo_dado = pd.DataFrame([[tipo, categoria, float(valor), inquilino, observacoes, divida_porcentagem, datetime.now().strftime("%d/%m/%Y")]], 
+                             columns=["Tipo", "Categoria", "Valor", "Inquilino", "Observações", "Divida Percentual", "Data"])
 
     # Verificar se o arquivo já existe
     if os.path.exists(nome_arquivo):
@@ -58,19 +58,33 @@ def lancar_despesas():
         
         # Se a categoria for "ALUGUEL", incluir o inquilino
         inquilino = campo_inquilino.get() if var_inquilino.get() else None
-        
+        divida_percentual_1 = campo_divida_percentual_1.get() if var_divida.get() else None
+        divida_percentual_2 = campo_divida_percentual_2.get() if var_divida.get() else None
+
         if categoria and valor.strip():
-            salvar_em_excel("Despesa", categoria, valor, inquilino, observacoes)
+            valor_float = float(valor)
+
+            # Se a despesa for dividida, calcular os valores para os dois prédios
+            if divida_percentual_1 and divida_percentual_2:
+                valor_gv = valor_float * float(divida_percentual_1) / 100
+                valor_jlp = valor_float * float(divida_percentual_2) / 100
+                salvar_em_excel("Despesa", categoria, valor_gv, inquilino, observacoes, divida_percentual_1, "GV")  # Salvar para o GV
+                salvar_em_excel("Despesa", categoria, valor_jlp, inquilino, observacoes, divida_percentual_2, "JLP")  # Salvar para o JLP
+            else:
+                salvar_em_excel("Despesa", categoria, valor_float, inquilino, observacoes, None, "GV")  # Salvar para o GV
+                salvar_em_excel("Despesa", categoria, valor_float, inquilino, observacoes, None, "JLP")  # Salvar para o JLP
             label_status.configure(text=f"Despesa '{categoria}' de R${valor} salva!", text_color="green")
             campo_valor.delete(0, ctk.END)
             campo_inquilino.delete(0, ctk.END)
             campo_observacoes.delete(0, ctk.END)
+            campo_divida_percentual_1.delete(0, ctk.END)
+            campo_divida_percentual_2.delete(0, ctk.END)
         else:
             label_status.configure(text="Por favor, preencha todos os campos.", text_color="red")
 
     janela_despesas = ctk.CTkToplevel(root)
     janela_despesas.title(f"Lançar Despesas - {prédio_selecionado}")
-    janela_despesas.geometry("500x350")
+    janela_despesas.geometry("500x450")
 
     ctk.CTkLabel(janela_despesas, text="Lançar Despesas", font=("Arial", 18, "bold")).pack(pady=10)
     ctk.CTkLabel(janela_despesas, text="Selecione a categoria:", font=("Arial", 14)).pack(pady=10)
@@ -84,9 +98,14 @@ def lancar_despesas():
     
     # Checkbox para inquilino e campo de entrada
     var_inquilino = ctk.BooleanVar(value=False)
-    
     check_inquilino = ctk.CTkCheckBox(janela_despesas, text="Descrição do Inquilino", variable=var_inquilino, onvalue=True, offvalue=False)
     campo_inquilino = ctk.CTkEntry(janela_despesas, placeholder_text="Nome do Inquilino", width=200)
+
+    # Checkbox para "Despesa dividida entre prédios?" e campos de porcentagem para cada prédio
+    var_divida = ctk.BooleanVar(value=False)
+    check_divida = ctk.CTkCheckBox(janela_despesas, text="Despesa dividida entre os prédios?", variable=var_divida, onvalue=True, offvalue=False)
+    campo_divida_percentual_1 = ctk.CTkEntry(janela_despesas, placeholder_text="% para GV", width=200)
+    campo_divida_percentual_2 = ctk.CTkEntry(janela_despesas, placeholder_text="% para JLP", width=200)
 
     ctk.CTkLabel(janela_despesas, text="Observações (opcional):", font=("Arial", 14)).pack(pady=10)
     campo_observacoes = ctk.CTkEntry(janela_despesas, placeholder_text="Observações", width=200)
@@ -94,21 +113,33 @@ def lancar_despesas():
 
     # Função que vai verificar a categoria e mostrar/ocultar o campo inquilino
     def toggle_inquilino(event=None):
-        print(f"Categoria selecionada: {combo_categorias.get()}")  # Depuração
         if combo_categorias.get() == "ALUGUÉIS":
-            print("Categoria 'ALUGUÉIS' selecionada. Exibindo campo Inquilino.")  # Depuração
             check_inquilino.pack(pady=10)
             campo_inquilino.pack(pady=5)
         else:
-            print("Categoria diferente de 'ALUGUÉIS'. Ocultando campo Inquilino.")  # Depuração
             check_inquilino.pack_forget()
             campo_inquilino.pack_forget()
+
+    # Função que vai verificar se a despesa é dividida e exibir os campos de percentual
+    def toggle_divida():
+        if var_divida.get():
+            campo_divida_percentual_1.pack(pady=10)
+            campo_divida_percentual_2.pack(pady=10)
+        else:
+            campo_divida_percentual_1.pack_forget()
+            campo_divida_percentual_2.pack_forget()
 
     # Adicionar o evento para atualizar quando a categoria for alterada
     combo_categorias.bind("<<ComboboxSelected>>", toggle_inquilino)
     
-    # Inicializar a visibilidade do campo inquilino ao abrir a janela
+    # Inicializar a visibilidade do campo inquilino e divisão ao abrir a janela
     toggle_inquilino()
+    toggle_divida()
+
+    check_divida.pack(pady=10)
+    
+    # Atualiza a visibilidade do campo percentual com base no checkbox
+    check_divida.configure(command=toggle_divida)
 
     ctk.CTkButton(janela_despesas, text="Salvar", command=salvar_despesa).pack(pady=10)
     
@@ -122,17 +153,33 @@ def lancar_receitas():
         valor = campo_valor.get()
         observacoes = campo_observacoes.get()
         
+        divida_percentual_1 = campo_divida_percentual_1.get() if var_divida.get() else None
+        divida_percentual_2 = campo_divida_percentual_2.get() if var_divida.get() else None
+
         if categoria and valor.strip():
-            salvar_em_excel("Receita", categoria, valor, observacoes=observacoes)
+            valor_float = float(valor)
+
+            # Se a receita for dividida, calcular os valores para os dois prédios
+            if divida_percentual_1 and divida_percentual_2:
+                valor_gv = valor_float * float(divida_percentual_1) / 100
+                valor_jlp = valor_float * float(divida_percentual_2) / 100
+                salvar_em_excel("Receita", categoria, valor_gv, observacoes=observacoes, divida_porcentagem=divida_percentual_1, predio_destino="GV")  # Salvar para o GV
+                salvar_em_excel("Receita", categoria, valor_jlp, observacoes=observacoes, divida_porcentagem=divida_percentual_2, predio_destino="JLP")  # Salvar para o JLP
+            else:
+                salvar_em_excel("Receita", categoria, valor_float, observacoes=observacoes, divida_porcentagem=None, predio_destino="GV")  # Salvar para o GV
+                salvar_em_excel("Receita", categoria, valor_float, observacoes=observacoes, divida_porcentagem=None, predio_destino="JLP")  # Salvar para o JLP
+
             label_status.configure(text=f"Receita '{categoria}' de R${valor} salva!", text_color="green")
             campo_valor.delete(0, ctk.END)
             campo_observacoes.delete(0, ctk.END)
+            campo_divida_percentual_1.delete(0, ctk.END)
+            campo_divida_percentual_2.delete(0, ctk.END)
         else:
             label_status.configure(text="Por favor, preencha todos os campos.", text_color="red")
 
     janela_receitas = ctk.CTkToplevel(root)
     janela_receitas.title(f"Lançar Receitas - {prédio_selecionado}")
-    janela_receitas.geometry("500x300")
+    janela_receitas.geometry("500x450")
 
     ctk.CTkLabel(janela_receitas, text="Lançar Receitas", font=("Arial", 18, "bold")).pack(pady=10)
     ctk.CTkLabel(janela_receitas, text="Selecione a categoria:", font=("Arial", 14)).pack(pady=10)
@@ -143,10 +190,30 @@ def lancar_receitas():
     ctk.CTkLabel(janela_receitas, text="Insira o valor:", font=("Arial", 14)).pack(pady=10)
     campo_valor = ctk.CTkEntry(janela_receitas, placeholder_text="Ex: 500.00", width=200)
     campo_valor.pack(pady=10)
+    
+    # Checkbox para "Receita dividida entre os prédios?" e campos de porcentagem para cada prédio
+    var_divida = ctk.BooleanVar(value=False)
+    check_divida = ctk.CTkCheckBox(janela_receitas, text="Receita dividida entre os prédios?", variable=var_divida, onvalue=True, offvalue=False)
+    campo_divida_percentual_1 = ctk.CTkEntry(janela_receitas, placeholder_text="% para GV", width=200)
+    campo_divida_percentual_2 = ctk.CTkEntry(janela_receitas, placeholder_text="% para JLP", width=200)
 
     ctk.CTkLabel(janela_receitas, text="Observações (opcional):", font=("Arial", 14)).pack(pady=10)
     campo_observacoes = ctk.CTkEntry(janela_receitas, placeholder_text="Observações", width=200)
     campo_observacoes.pack(pady=10)
+
+    # Função que vai verificar se a receita é dividida e exibir os campos de percentual
+    def toggle_divida():
+        if var_divida.get():
+            campo_divida_percentual_1.pack(pady=10)
+            campo_divida_percentual_2.pack(pady=10)
+        else:
+            campo_divida_percentual_1.pack_forget()
+            campo_divida_percentual_2.pack_forget()
+
+    check_divida.pack(pady=10)
+    
+    # Atualiza a visibilidade do campo percentual com base no checkbox
+    check_divida.configure(command=toggle_divida)
 
     ctk.CTkButton(janela_receitas, text="Salvar", command=salvar_receita).pack(pady=10)
     
