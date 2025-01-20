@@ -282,6 +282,122 @@ def transferir_receita():
     label_status = ctk.CTkLabel(janela_transf, text="", font=("Arial", 12))
     label_status.pack(pady=5)
 
+def adicionar_nova_despesa():
+    print("Adicionando nova despesa")
+
+    '''
+    CATEGORIAS PADRÕES, QUERO MONTAR UMA LÓGICA QUE ADICIONE NOVAS
+    categorias_despesas = [
+        "SERVIÇOS", "TARIFAS", "VIAGENS", "MOBILIÁRIO", "EQUIPAMENTOS", 
+        "PROJETOS", "CONDOMÍNIO", "CONTABILIDADE", "DIVERSAS", "ESCRITÓRIO", 
+        "MÃO DE OBRA", "MATERIAIS", "RETIRADAS E RETIRADAS EXTRAS", "FGTS", 
+        "GPS", "PIS E COFINS", "CONTRIBUIÇÃO SOCIAL E IMPOSTO DE RENDA"
+    ]
+
+    '''
+
+# Caminho do arquivo Excel onde as categorias serão salvas
+arquivo_categorias = "categorias.xlsx"
+
+# Lista de categorias padrão
+categorias_padrao = [
+    "SERVIÇOS", "TARIFAS", "VIAGENS", "MOBILIÁRIO", "EQUIPAMENTOS",
+    "PROJETOS", "CONDOMÍNIO", "CONTABILIDADE", "DIVERSAS", "ESCRITÓRIO",
+    "MÃO DE OBRA", "MATERIAIS", "RETIRADAS E RETIRADAS EXTRAS", "FGTS",
+    "GPS", "PIS E COFINS", "CONTRIBUIÇÃO SOCIAL E IMPOSTO DE RENDA"
+]
+
+# Verifica se o arquivo Excel existe, caso contrário, cria um novo com as categorias padrão
+if os.path.exists(arquivo_categorias):
+    df = pd.read_excel(arquivo_categorias)
+    categorias_despesas = df["Categorias"].tolist()
+else:
+    categorias_despesas = categorias_padrao.copy()
+    df = pd.DataFrame({"Categorias": categorias_despesas})
+    df.to_excel(arquivo_categorias, index=False)
+
+def salvar_categorias_no_excel():
+    """Salva as categorias no arquivo Excel"""
+    df = pd.DataFrame({"Categorias": categorias_despesas})
+    df.to_excel(arquivo_categorias, index=False)
+
+def adicionar_nova_categoria():
+    # Função para salvar a nova categoria
+    def salvar_categoria():
+        nova_categoria = campo_nova_categoria.get().strip().upper()
+        if nova_categoria and nova_categoria not in categorias_despesas:
+            # Adiciona a nova categoria à lista e salva no Excel
+            categorias_despesas.append(nova_categoria)
+            salvar_categorias_no_excel()
+
+            # Limpa o campo de entrada
+            campo_nova_categoria.delete(0, ctk.END)
+            
+            # Exibe a mensagem de sucesso
+            label_status_categoria.configure(text=f"Categoria '{nova_categoria}' adicionada!", text_color="green")
+        elif nova_categoria in categorias_despesas:
+            label_status_categoria.configure(text="Essa categoria já existe!", text_color="orange")
+        else:
+            label_status_categoria.configure(text="Por favor, insira um nome válido.", text_color="red")
+
+    # Janela para adicionar nova categoria
+    janela_nova_categoria = ctk.CTkToplevel()
+    janela_nova_categoria.title("Adicionar Nova Categoria de Despesa")
+    janela_nova_categoria.geometry("400x200")
+    
+    # Título
+    ctk.CTkLabel(janela_nova_categoria, text="Nova Categoria de Despesa", font=("Arial", 18, "bold")).pack(pady=10)
+    
+    # Entrada de categoria
+    ctk.CTkLabel(janela_nova_categoria, text="Nome da nova categoria:").pack(pady=5)
+    campo_nova_categoria = ctk.CTkEntry(janela_nova_categoria, placeholder_text="Ex: NOVA CATEGORIA", width=200)
+    campo_nova_categoria.pack(pady=5)
+    
+    # Botão para adicionar
+    ctk.CTkButton(janela_nova_categoria, text="Adicionar", command=salvar_categoria).pack(pady=10)
+    
+    # Mensagem de status
+    label_status_categoria = ctk.CTkLabel(janela_nova_categoria, text="", font=("Arial", 12))
+    label_status_categoria.pack(pady=5)
+
+def excluir_categoria():
+    """Abre uma janela para excluir uma categoria existente"""
+    def remover_categoria():
+        categoria_selecionada = combo_categorias.get()
+        if categoria_selecionada:
+            # Remove a categoria da lista e salva no Excel
+            categorias_despesas.remove(categoria_selecionada)
+            salvar_categorias_no_excel()
+
+            # Atualiza o combobox
+            combo_categorias.configure(values=categorias_despesas)
+            combo_categorias.set("")
+
+            # Mensagem de sucesso
+            label_status_excluir.configure(text=f"Categoria '{categoria_selecionada}' excluída!", text_color="green")
+        else:
+            label_status_excluir.configure(text="Selecione uma categoria para excluir.", text_color="red")
+
+    # Janela para excluir categoria
+    janela_excluir_categoria = ctk.CTkToplevel()
+    janela_excluir_categoria.title("Excluir Categoria de Despesa")
+    janela_excluir_categoria.geometry("400x200")
+    
+    # Título
+    ctk.CTkLabel(janela_excluir_categoria, text="Excluir Categoria de Despesa", font=("Arial", 18, "bold")).pack(pady=10)
+    
+    # Combobox para selecionar a categoria
+    ctk.CTkLabel(janela_excluir_categoria, text="Selecione a categoria:").pack(pady=5)
+    combo_categorias = ctk.CTkComboBox(janela_excluir_categoria, values=categorias_despesas)
+    combo_categorias.pack(pady=5)
+    
+    # Botão para excluir a categoria selecionada
+    ctk.CTkButton(janela_excluir_categoria, text="Excluir", command=remover_categoria).pack(pady=10)
+    
+    # Mensagem de status
+    label_status_excluir = ctk.CTkLabel(janela_excluir_categoria, text="", font=("Arial", 12))
+    label_status_excluir.pack(pady=5)
+
 
 
 # Função para selecionar o prédio
@@ -308,6 +424,10 @@ label_predio.pack(pady=10)
 ctk.CTkButton(root, text="Lançar Despesas", command=lancar_despesas, width=200).pack(pady=10)
 ctk.CTkButton(root, text="Lançar Receitas", command=lancar_receitas, width=200).pack(pady=10)
 ctk.CTkButton(root, text="Transferir Receita entre os prédios", command=transferir_receita, width=200).pack(pady=10)
+
+# Botão na janela principal para abrir a janela de adicionar nova categoria
+ctk.CTkButton(root, text="Adicionar Nova Categoria de Despesa", command=adicionar_nova_categoria, width=200).pack(pady=10)
+ctk.CTkButton(root, text="Excluir Categoria de Despesa", command=excluir_categoria, width=200).pack(pady=10)
 
 # Loop da aplicação
 root.mainloop()
