@@ -219,6 +219,69 @@ def lancar_receitas():
     label_status = ctk.CTkLabel(janela_receitas, text="", font=("Arial", 12))
     label_status.pack(pady=5)
 
+def salvar_transferencia(valor, origem, destino, observacoes=None):
+    """ Salva a transferência entre prédios em um arquivo Excel """
+    nome_arquivo = "transferencias.xlsx"
+    nova_transferencia = pd.DataFrame([
+        [float(valor), origem, destino, observacoes, datetime.now().strftime("%d/%m/%Y")]
+    ], columns=["Valor", "Origem", "Destino", "Observações", "Data"])
+
+    if os.path.exists(nome_arquivo):
+        df_existente = pd.read_excel(nome_arquivo)
+        df_final = pd.concat([df_existente, nova_transferencia], ignore_index=True)
+    else:
+        df_final = nova_transferencia
+
+    df_final.to_excel(nome_arquivo, index=False)
+    print(f"Transferência de R${valor} de {origem} para {destino} registrada!")
+
+def transferir_receita():
+    """ Interface para transferência de receita entre prédios """
+    janela_transf = ctk.CTkToplevel(root)
+    janela_transf.title("Transferência de Receita")
+    janela_transf.geometry("400x300")
+    
+    ctk.CTkLabel(janela_transf, text="Transferir Receita", font=("Arial", 18, "bold")).pack(pady=10)
+    
+    ctk.CTkLabel(janela_transf, text="Valor:").pack(pady=5)
+    campo_valor = ctk.CTkEntry(janela_transf, placeholder_text="Ex: 1000.00", width=200)
+    campo_valor.pack(pady=5)
+    
+    ctk.CTkLabel(janela_transf, text="Origem:").pack(pady=5)
+    combo_origem = ctk.CTkComboBox(janela_transf, values=["GV", "JLP"], width=200)
+    combo_origem.pack(pady=5)
+    
+    ctk.CTkLabel(janela_transf, text="Destino:").pack(pady=5)
+    combo_destino = ctk.CTkComboBox(janela_transf, values=["GV", "JLP"], width=200)
+    combo_destino.pack(pady=5)
+    
+    ctk.CTkLabel(janela_transf, text="Observações (opcional):").pack(pady=5)
+    campo_observacoes = ctk.CTkEntry(janela_transf, placeholder_text="Observações", width=200)
+    campo_observacoes.pack(pady=5)
+    
+    def salvar():
+        valor = campo_valor.get()
+        origem = combo_origem.get()
+        destino = combo_destino.get()
+        observacoes = campo_observacoes.get()
+        
+        if origem == destino:
+            label_status.configure(text="Erro: Origem e destino devem ser diferentes!", text_color="red")
+            return
+        
+        if valor.strip():
+            salvar_transferencia(valor, origem, destino, observacoes)
+            label_status.configure(text=f"Transferência de R${valor} registrada!", text_color="green")
+            campo_valor.delete(0, ctk.END)
+            campo_observacoes.delete(0, ctk.END)
+        else:
+            label_status.configure(text="Por favor, insira um valor.", text_color="red")
+    
+    ctk.CTkButton(janela_transf, text="Salvar", command=salvar).pack(pady=10)
+    
+    label_status = ctk.CTkLabel(janela_transf, text="", font=("Arial", 12))
+    label_status.pack(pady=5)
+
 
 
 # Função para selecionar o prédio
@@ -244,6 +307,7 @@ label_predio.pack(pady=10)
 # Botões para lançar despesas e receitas
 ctk.CTkButton(root, text="Lançar Despesas", command=lancar_despesas, width=200).pack(pady=10)
 ctk.CTkButton(root, text="Lançar Receitas", command=lancar_receitas, width=200).pack(pady=10)
+ctk.CTkButton(root, text="Transferir Receita entre os prédios", command=transferir_receita, width=200).pack(pady=10)
 
 # Loop da aplicação
 root.mainloop()
