@@ -420,248 +420,37 @@ def selecionar_predio(predio):
     prédio_selecionado = predio
     label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
 
+# Interface principal
+ctk.CTkLabel(root, text="Gerenciador Financeiro", font=("Arial", 20, "bold")).pack(pady=20)
 
-# Configuração principal do CTk
-ctk.set_appearance_mode("System")
-ctk.set_default_color_theme("blue")
-root = ctk.CTk()
-root.geometry("800x600")
-root.title("Gerenciador Financeiro")
+# Seleção de prédio
+ctk.CTkLabel(root, text="Selecione o prédio:", font=("Arial", 14)).pack(pady=10)
+frame_botoes = ctk.CTkFrame(root)
+frame_botoes.pack(pady=5)
 
-# Menu lateral
-frame_menu = ctk.CTkFrame(root, width=200, corner_radius=0)
-frame_menu.pack(side="left", fill="y")
+ctk.CTkButton(frame_botoes, text="GV", command=lambda: selecionar_predio("GV"), width=80).pack(side="left", padx=10)
+ctk.CTkButton(frame_botoes, text="JLP", command=lambda: selecionar_predio("JLP"), width=80).pack(side="left", padx=10)
 
-ctk.CTkLabel(frame_menu, text="Menu", font=("Arial", 16, "bold")).pack(pady=20)
-
-ctk.CTkButton(frame_menu, text="GV", command=lambda: selecionar_predio("GV"), width=180).pack(pady=10)
-ctk.CTkButton(frame_menu, text="JLP", command=lambda: selecionar_predio("JLP"), width=180).pack(pady=10)
-
-
-
-def atualizar_menu_categorias(tipo):
-    """ Atualiza o conteúdo da área principal com os campos para adicionar ou excluir categorias """
-    # Limpa o conteúdo atual da área de conteúdo
-    for widget in frame_conteudo.winfo_children():
-        widget.destroy()
-    
-    if tipo == "adicionar_despesa":
-        ctk.CTkLabel(frame_conteudo, text="Adicionar Nova Categoria (Despesa)", font=("Arial", 18, "bold")).pack(pady=10)
-        
-        ctk.CTkLabel(frame_conteudo, text="Nome da nova categoria:").pack(pady=5)
-        campo_nova_categoria = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: NOVA CATEGORIA", width=200)
-        campo_nova_categoria.pack(pady=5)
-        
-        def salvar_categoria():
-            nova_categoria = campo_nova_categoria.get().strip().upper()
-            
-            if nova_categoria and nova_categoria not in categorias_despesas:
-                categorias_despesas.append(nova_categoria)
-                salvar_categorias_no_excel("despesas")
-                campo_nova_categoria.delete(0, ctk.END)
-                label_status_categoria.configure(text=f"Categoria '{nova_categoria}' adicionada!", text_color="green")
-            elif nova_categoria in categorias_despesas:
-                label_status_categoria.configure(text="Essa categoria já existe!", text_color="orange")
-            else:
-                label_status_categoria.configure(text="Por favor, insira um nome válido.", text_color="red")
-
-        ctk.CTkButton(frame_conteudo, text="Adicionar", command=salvar_categoria).pack(pady=10)
-        
-        label_status_categoria = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
-        label_status_categoria.pack(pady=5)
-
-    elif tipo == "excluir_despesa":
-        ctk.CTkLabel(frame_conteudo, text="Excluir Categoria (Despesa)", font=("Arial", 18, "bold")).pack(pady=10)
-        
-        ctk.CTkLabel(frame_conteudo, text="Selecione a categoria:").pack(pady=5)
-        combo_categorias = ctk.CTkComboBox(frame_conteudo, values=categorias_despesas)
-        combo_categorias.pack(pady=5)
-        
-        def remover_categoria():
-            categoria_selecionada = combo_categorias.get()
-            
-            if categoria_selecionada:
-                categorias_despesas.remove(categoria_selecionada)
-                salvar_categorias_no_excel("despesas")
-                combo_categorias.configure(values=categorias_despesas)
-                combo_categorias.set("")
-                label_status_excluir.configure(text=f"Categoria '{categoria_selecionada}' excluída!", text_color="green")
-            else:
-                label_status_excluir.configure(text="Selecione uma categoria para excluir.", text_color="red")
-
-        ctk.CTkButton(frame_conteudo, text="Excluir", command=remover_categoria).pack(pady=10)
-        
-        label_status_excluir = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
-        label_status_excluir.pack(pady=5)
-
-    elif tipo == "adicionar_receita":
-        ctk.CTkLabel(frame_conteudo, text="Adicionar Nova Categoria (Receita)", font=("Arial", 18, "bold")).pack(pady=10)
-        
-        ctk.CTkLabel(frame_conteudo, text="Nome da nova categoria:").pack(pady=5)
-        campo_nova_categoria = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: NOVA CATEGORIA", width=200)
-        campo_nova_categoria.pack(pady=5)
-        
-        def salvar_categoria():
-            nova_categoria = campo_nova_categoria.get().strip().upper()
-            
-            if nova_categoria and nova_categoria not in categorias_receitas:
-                categorias_receitas.append(nova_categoria)
-                salvar_categorias_no_excel("receitas")
-                campo_nova_categoria.delete(0, ctk.END)
-                label_status_categoria.configure(text=f"Categoria '{nova_categoria}' adicionada!", text_color="green")
-            elif nova_categoria in categorias_receitas:
-                label_status_categoria.configure(text="Essa categoria já existe!", text_color="orange")
-            else:
-                label_status_categoria.configure(text="Por favor, insira um nome válido.", text_color="red")
-
-        ctk.CTkButton(frame_conteudo, text="Adicionar", command=salvar_categoria).pack(pady=10)
-        
-        label_status_categoria = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
-        label_status_categoria.pack(pady=5)
-
-    elif tipo == "excluir_receita":
-        ctk.CTkLabel(frame_conteudo, text="Excluir Categoria (Receita)", font=("Arial", 18, "bold")).pack(pady=10)
-        
-        ctk.CTkLabel(frame_conteudo, text="Selecione a categoria:").pack(pady=5)
-        combo_categorias = ctk.CTkComboBox(frame_conteudo, values=categorias_receitas)
-        combo_categorias.pack(pady=5)
-        
-        def remover_categoria():
-            categoria_selecionada = combo_categorias.get()
-            
-            if categoria_selecionada:
-                categorias_receitas.remove(categoria_selecionada)
-                salvar_categorias_no_excel("receitas")
-                combo_categorias.configure(values=categorias_receitas)
-                combo_categorias.set("")
-                label_status_excluir.configure(text=f"Categoria '{categoria_selecionada}' excluída!", text_color="green")
-            else:
-                label_status_excluir.configure(text="Selecione uma categoria para excluir.", text_color="red")
-
-        ctk.CTkButton(frame_conteudo, text="Excluir", command=remover_categoria).pack(pady=10)
-        
-        label_status_excluir = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
-        label_status_excluir.pack(pady=5)
-
-def atualizar_lancamento(tipo):
-    """ Atualiza o conteúdo da área principal com os campos para lançar despesas, receitas ou transferir receita """
-    # Limpa o conteúdo atual da área de conteúdo
-    for widget in frame_conteudo.winfo_children():
-        widget.destroy()
-    
-    if tipo == "lancar_despesas":
-        ctk.CTkLabel(frame_conteudo, text="Lançar Despesas", font=("Arial", 18, "bold")).pack(pady=10)
-        
-        ctk.CTkLabel(frame_conteudo, text="Valor da Despesa:").pack(pady=5)
-        campo_valor_despesa = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 100,00", width=200)
-        campo_valor_despesa.pack(pady=5)
-        
-        ctk.CTkLabel(frame_conteudo, text="Categoria:").pack(pady=5)
-        combo_categoria_despesa = ctk.CTkComboBox(frame_conteudo, values=categorias_despesas)
-        combo_categoria_despesa.pack(pady=5)
-        
-        def salvar_despesa():
-            valor = campo_valor_despesa.get().strip()
-            categoria = combo_categoria_despesa.get()
-            
-            if valor and categoria:
-                # Aqui, você pode adicionar o código para salvar a despesa
-                label_status_lancamento.configure(text=f"Despesa de R${valor} na categoria '{categoria}' registrada!", text_color="green")
-            else:
-                label_status_lancamento.configure(text="Preencha todos os campos corretamente.", text_color="red")
-
-        ctk.CTkButton(frame_conteudo, text="Registrar Despesa", command=salvar_despesa).pack(pady=10)
-        
-        label_status_lancamento = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
-        label_status_lancamento.pack(pady=5)
-
-    elif tipo == "lancar_receitas":
-        ctk.CTkLabel(frame_conteudo, text="Lançar Receita", font=("Arial", 18, "bold")).pack(pady=10)
-        
-        ctk.CTkLabel(frame_conteudo, text="Valor da Receita:").pack(pady=5)
-        campo_valor_receita = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 1500,00", width=200)
-        campo_valor_receita.pack(pady=5)
-        
-        ctk.CTkLabel(frame_conteudo, text="Categoria:").pack(pady=5)
-        combo_categoria_receita = ctk.CTkComboBox(frame_conteudo, values=categorias_receitas)
-        combo_categoria_receita.pack(pady=5)
-        
-        def salvar_receita():
-            valor = campo_valor_receita.get().strip()
-            categoria = combo_categoria_receita.get()
-            
-            if valor and categoria:
-                # Aqui, você pode adicionar o código para salvar a receita
-                label_status_lancamento.configure(text=f"Receita de R${valor} na categoria '{categoria}' registrada!", text_color="green")
-            else:
-                label_status_lancamento.configure(text="Preencha todos os campos corretamente.", text_color="red")
-
-        ctk.CTkButton(frame_conteudo, text="Registrar Receita", command=salvar_receita).pack(pady=10)
-        
-        label_status_lancamento = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
-        label_status_lancamento.pack(pady=5)
-
-
-    elif tipo == "transferir_receita":
-        """ Interface para transferência de receita entre prédios """
-        ctk.CTkLabel(frame_conteudo, text="Transferir Receita", font=("Arial", 18, "bold")).pack(pady=10)
-        
-        ctk.CTkLabel(frame_conteudo, text="Valor:").pack(pady=5)
-        campo_valor = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 1000.00", width=200)
-        campo_valor.pack(pady=5)
-        
-        ctk.CTkLabel(frame_conteudo, text="Origem:").pack(pady=5)
-        combo_origem = ctk.CTkComboBox(frame_conteudo, values=["GV", "JLP"], width=200)
-        combo_origem.pack(pady=5)
-        
-        ctk.CTkLabel(frame_conteudo, text="Destino:").pack(pady=5)
-        combo_destino = ctk.CTkComboBox(frame_conteudo, values=["GV", "JLP"], width=200)
-        combo_destino.pack(pady=5)
-        
-        ctk.CTkLabel(frame_conteudo, text="Observações (opcional):").pack(pady=5)
-        campo_observacoes = ctk.CTkEntry(frame_conteudo, placeholder_text="Observações", width=200)
-        campo_observacoes.pack(pady=5)
-        
-        def salvar():
-            valor = campo_valor.get()
-            origem = combo_origem.get()
-            destino = combo_destino.get()
-            observacoes = campo_observacoes.get()
-            
-            if origem == destino:
-                label_status.configure(text="Erro: Origem e destino devem ser diferentes!", text_color="red")
-                return
-            
-            if valor.strip():
-                salvar_transferencia(valor, origem, destino, observacoes)
-                label_status.configure(text=f"Transferência de R${valor} registrada!", text_color="green")
-                campo_valor.delete(0, ctk.END)
-                campo_observacoes.delete(0, ctk.END)
-            else:
-                label_status.configure(text="Por favor, insira um valor.", text_color="red")
-        
-        ctk.CTkButton(frame_conteudo, text="Salvar", command=salvar).pack(pady=10)
-        
-        label_status = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
-        label_status.pack(pady=5)
-
-
-
-# Agora, nos botões, você chama a função de atualização de acordo com o tipo:
-ctk.CTkButton(frame_menu, text="Adicionar Categoria (Despesa)", command=lambda: atualizar_menu_categorias("adicionar_despesa"), width=180).pack(pady=10)
-ctk.CTkButton(frame_menu, text="Excluir Categoria (Despesa)", command=lambda: atualizar_menu_categorias("excluir_despesa"), width=180).pack(pady=10)
-ctk.CTkButton(frame_menu, text="Adicionar Categoria (Receita)", command=lambda: atualizar_menu_categorias("adicionar_receita"), width=180).pack(pady=10)
-ctk.CTkButton(frame_menu, text="Excluir Categoria (Receita)", command=lambda: atualizar_menu_categorias("excluir_receita"), width=180).pack(pady=10)
-ctk.CTkButton(frame_menu, text="Lançar Despesas", command=lambda: atualizar_lancamento("lancar_despesas"), width=180).pack(pady=10)
-ctk.CTkButton(frame_menu, text="Lançar Receitas", command=lambda: atualizar_lancamento("lancar_receitas"), width=180).pack(pady=10)
-ctk.CTkButton(frame_menu, text="Transferir Receita", command=lambda: atualizar_lancamento("transferir_receita"), width=180).pack(pady=10)
-
-# Área de conteúdo principal
-frame_conteudo = ctk.CTkFrame(root)
-frame_conteudo.pack(side="right", fill="both", expand=True, padx=20, pady=20)
-
-label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
+label_predio = ctk.CTkLabel(root, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
 label_predio.pack(pady=10)
+
+# Botões para lançar despesas e receitas
+ctk.CTkButton(root, text="Lançar Despesas", command=lancar_despesas, width=200).pack(pady=10)
+ctk.CTkButton(root, text="Lançar Receitas", command=lancar_receitas, width=200).pack(pady=10)
+ctk.CTkButton(root, text="Transferir Receita entre os prédios", command=transferir_receita, width=200).pack(pady=10)
+
+# Botão para adicionar nova categoria de despesa
+ctk.CTkButton(root, text="Adicionar Nova Categoria de Despesa", command=lambda: adicionar_nova_categoria("despesas"), width=200).pack(pady=10)
+
+# Botão para excluir categoria de despesa
+ctk.CTkButton(root, text="Excluir Categoria de Despesa", command=lambda: excluir_categoria("despesas"), width=200).pack(pady=10)
+
+# Botão para adicionar nova categoria de receita
+ctk.CTkButton(root, text="Adicionar Nova Categoria de Receita", command=lambda: adicionar_nova_categoria("receitas"), width=200).pack(pady=10)
+
+# Botão para excluir categoria de receita
+ctk.CTkButton(root, text="Excluir Categoria de Receita", command=lambda: excluir_categoria("receitas"), width=200).pack(pady=10)
+
 
 # Loop da aplicação
 root.mainloop()
