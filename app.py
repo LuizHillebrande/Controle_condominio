@@ -414,6 +414,8 @@ def excluir_categoria(tipo):
 
 
 
+prédio_selecionado = None
+
 # Função para selecionar o prédio
 def selecionar_predio(predio):
     global prédio_selecionado
@@ -446,6 +448,9 @@ def atualizar_menu_categorias(tipo):
         widget.destroy()
     
     if tipo == "adicionar_despesa":
+        label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
+        label_predio.pack(pady=10)
+        label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
         ctk.CTkLabel(frame_conteudo, text="Adicionar Nova Categoria (Despesa)", font=("Arial", 18, "bold")).pack(pady=10)
         
         ctk.CTkLabel(frame_conteudo, text="Nome da nova categoria:").pack(pady=5)
@@ -471,6 +476,9 @@ def atualizar_menu_categorias(tipo):
         label_status_categoria.pack(pady=5)
 
     elif tipo == "excluir_despesa":
+        label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
+        label_predio.pack(pady=10)
+        label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
         ctk.CTkLabel(frame_conteudo, text="Excluir Categoria (Despesa)", font=("Arial", 18, "bold")).pack(pady=10)
         
         ctk.CTkLabel(frame_conteudo, text="Selecione a categoria:").pack(pady=5)
@@ -495,6 +503,9 @@ def atualizar_menu_categorias(tipo):
         label_status_excluir.pack(pady=5)
 
     elif tipo == "adicionar_receita":
+        label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
+        label_predio.pack(pady=10)
+        label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
         ctk.CTkLabel(frame_conteudo, text="Adicionar Nova Categoria (Receita)", font=("Arial", 18, "bold")).pack(pady=10)
         
         ctk.CTkLabel(frame_conteudo, text="Nome da nova categoria:").pack(pady=5)
@@ -520,6 +531,9 @@ def atualizar_menu_categorias(tipo):
         label_status_categoria.pack(pady=5)
 
     elif tipo == "excluir_receita":
+        label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
+        label_predio.pack(pady=10)
+        label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
         ctk.CTkLabel(frame_conteudo, text="Excluir Categoria (Receita)", font=("Arial", 18, "bold")).pack(pady=10)
         
         ctk.CTkLabel(frame_conteudo, text="Selecione a categoria:").pack(pady=5)
@@ -543,6 +557,29 @@ def atualizar_menu_categorias(tipo):
         label_status_excluir = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
         label_status_excluir.pack(pady=5)
 
+def salvar_lancamento_em_excel(tipo, valor, categoria, predio_destino):
+    if not predio_destino:
+        return
+    
+    # Criar nome do arquivo Excel para o prédio de destino
+    mes_atual = datetime.now().strftime("%Y-%m")
+    nome_arquivo = f"{predio_destino}_{mes_atual}.xlsx"
+    
+    # Adicionar as informações do lançamento (valor, categoria e data)
+    novo_dado = pd.DataFrame([[tipo, categoria, float(valor), datetime.now().strftime("%d/%m/%Y")]], 
+                             columns=["Tipo", "Categoria", "Valor", "Data"])
+    
+    # Verificar se o arquivo já existe
+    if os.path.exists(nome_arquivo):
+        df_existente = pd.read_excel(nome_arquivo)
+        df_final = pd.concat([df_existente, novo_dado], ignore_index=True)
+    else:
+        df_final = novo_dado
+
+    # Salvar no Excel
+    df_final.to_excel(nome_arquivo, index=False)
+    print(f"{tipo} de R${valor} na categoria '{categoria}' salva em {nome_arquivo}!")
+
 def atualizar_lancamento(tipo):
     """ Atualiza o conteúdo da área principal com os campos para lançar despesas, receitas ou transferir receita """
     # Limpa o conteúdo atual da área de conteúdo
@@ -550,6 +587,9 @@ def atualizar_lancamento(tipo):
         widget.destroy()
     
     if tipo == "lancar_despesas":
+        label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
+        label_predio.pack(pady=10)
+        label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
         ctk.CTkLabel(frame_conteudo, text="Lançar Despesas", font=("Arial", 18, "bold")).pack(pady=10)
         
         ctk.CTkLabel(frame_conteudo, text="Valor da Despesa:").pack(pady=5)
@@ -565,8 +605,9 @@ def atualizar_lancamento(tipo):
             categoria = combo_categoria_despesa.get()
             
             if valor and categoria:
-                # Aqui, você pode adicionar o código para salvar a despesa
-                label_status_lancamento.configure(text=f"Despesa de R${valor} na categoria '{categoria}' registrada!", text_color="green")
+                # Chama a função para salvar a despesa no Excel
+                salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado)
+                label_status_lancamento.configure(text=f"Despesa de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!", text_color="green")
             else:
                 label_status_lancamento.configure(text="Preencha todos os campos corretamente.", text_color="red")
 
@@ -576,6 +617,9 @@ def atualizar_lancamento(tipo):
         label_status_lancamento.pack(pady=5)
 
     elif tipo == "lancar_receitas":
+        label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
+        label_predio.pack(pady=10)
+        label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
         ctk.CTkLabel(frame_conteudo, text="Lançar Receita", font=("Arial", 18, "bold")).pack(pady=10)
         
         ctk.CTkLabel(frame_conteudo, text="Valor da Receita:").pack(pady=5)
@@ -593,6 +637,7 @@ def atualizar_lancamento(tipo):
             if valor and categoria:
                 # Aqui, você pode adicionar o código para salvar a receita
                 label_status_lancamento.configure(text=f"Receita de R${valor} na categoria '{categoria}' registrada!", text_color="green")
+                salvar_lancamento_em_excel("Receita", valor, categoria, prédio_selecionado)
             else:
                 label_status_lancamento.configure(text="Preencha todos os campos corretamente.", text_color="red")
 
@@ -603,6 +648,9 @@ def atualizar_lancamento(tipo):
 
 
     elif tipo == "transferir_receita":
+        label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
+        label_predio.pack(pady=10)
+        label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
         """ Interface para transferência de receita entre prédios """
         ctk.CTkLabel(frame_conteudo, text="Transferir Receita", font=("Arial", 18, "bold")).pack(pady=10)
         
