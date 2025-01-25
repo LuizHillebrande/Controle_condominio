@@ -630,6 +630,7 @@ def atualizar_lancamento(tipo):
         combo_categoria_receita = ctk.CTkComboBox(frame_conteudo, values=categorias_receitas)
         combo_categoria_receita.pack(pady=5)
         
+        
         def salvar_receita():
             valor = campo_valor_receita.get().strip()
             categoria = combo_categoria_receita.get()
