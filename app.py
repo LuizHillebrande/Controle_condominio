@@ -24,6 +24,8 @@ categorias_despesas = [
 # Variável global para armazenar o prédio selecionado
 prédio_selecionado = ""
 
+
+
 # Função para salvar os dados na planilha Excel
 def salvar_em_excel(tipo, categoria, valor, inquilino=None, observacoes=None, divida_porcentagem=None, predio_destino=None):
     global prédio_selecionado
@@ -439,6 +441,133 @@ ctk.CTkLabel(frame_menu, text="Menu", font=("Arial", 16, "bold")).pack(pady=20)
 ctk.CTkButton(frame_menu, text="GV", command=lambda: selecionar_predio("GV"), width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="JLP", command=lambda: selecionar_predio("JLP"), width=180).pack(pady=10)
 
+# Lista de sócios global
+socios = []
+
+from tkinter import messagebox
+# Função para carregar os dados dos sócios a partir de um arquivo Excel
+def carregar_socios():
+    """ Carregar os sócios de um arquivo Excel se existir """
+    if os.path.exists("socios.xlsx"):
+        df = pd.read_excel("socios.xlsx")
+        global socios
+        socios = df.to_dict(orient="records")  # Carregar os sócios como um dicionário
+    else:
+        messagebox.showwarning('Atenção!', 'Nenhum arquivo sócios.xlsx encontrado!')
+        socios = []  # Se não houver arquivo, inicia com lista vazia
+
+# Função para salvar os sócios em um arquivo Excel
+def salvar_socios():
+    """ Salvar os dados de sócios em um arquivo Excel """
+    df = pd.DataFrame(socios)
+    df.to_excel("socios.xlsx", index=False)
+    print("Socios salvos com sucesso!")
+
+# Função para adicionar um sócio
+def adicionar_socio():
+    nome_socio = campo_nome_socio.get().strip()
+    porcentagem_socio = campo_porcentagem_socio.get().strip()
+
+    if nome_socio and porcentagem_socio:
+        try:
+            porcentagem = float(porcentagem_socio)
+            if 0 < porcentagem <= 100:
+                # Não há mais verificação de soma das porcentagens
+                # Adiciona o sócio à lista de sócios
+                socios.append({"nome": nome_socio, "porcentagem": porcentagem, "prédio": "", "selected": False})
+                campo_nome_socio.delete(0, ctk.END)
+                campo_porcentagem_socio.delete(0, ctk.END)
+                exibir_socios()  # Atualiza a lista de sócios
+                salvar_socios()  # Salva os sócios no arquivo
+                label_status.configure(text="Sócio adicionado com sucesso!", text_color="green")
+            else:
+                label_status.configure(text="Porcentagem deve ser entre 0 e 100.", text_color="red")
+        except ValueError:
+            label_status.configure(text="Porcentagem inválida. Insira um número.", text_color="red")
+    else:
+        label_status.configure(text="Por favor, preencha todos os campos.", text_color="red")
+# Função para exibir os sócios e suas porcentagens
+def exibir_socios():
+    """ Exibir os sócios com checkbox para selecionar o prédio e exclusão """
+    for widget in frame_socios.winfo_children():
+        widget.destroy()  # Limpa os widgets antigos
+
+    for socio in socios:
+        # Exibir nome e porcentagem do sócio, com checkbox para seleção de prédio
+        socio_frame = ctk.CTkFrame(frame_socios)
+        socio_frame.pack(pady=5, fill="x")
+
+        ctk.CTkLabel(socio_frame, text=f"{socio['nome']} - {socio['porcentagem']}%", font=("Arial", 12)).pack(side="left", padx=10)
+        
+        # Checkbox para escolher o prédio (GV ou JLP)
+        var_prédio = ctk.StringVar(value=socio['prédio'])
+        checkbox_gv = ctk.CTkRadioButton(socio_frame, text="GV", variable=var_prédio, value="GV", command=lambda s=socio, v=var_prédio: atualizar_predio_socio(s, v))
+        checkbox_gv.pack(side="left", padx=5)
+        checkbox_jlp = ctk.CTkRadioButton(socio_frame, text="JLP", variable=var_prédio, value="JLP", command=lambda s=socio, v=var_prédio: atualizar_predio_socio(s, v))
+        checkbox_jlp.pack(side="left", padx=5)
+
+        # Checkbox para selecionar o sócio para exclusão
+        var_selected = ctk.BooleanVar(value=socio['selected'])
+        checkbox_delete = ctk.CTkCheckBox(socio_frame, text="Excluir", variable=var_selected, command=lambda s=socio, v=var_selected: atualizar_selecao_exclusao(s, v))
+        checkbox_delete.pack(side="right", padx=5)
+
+# Função para atualizar o prédio do sócio (GV ou JLP)
+def atualizar_predio_socio(socio, var_prédio):
+    """ Atualiza o prédio atribuído ao sócio """
+    socio['prédio'] = var_prédio.get()
+    salvar_socios()  # Salva novamente após atualização do prédio
+
+# Função para atualizar a seleção de exclusão do sócio
+def atualizar_selecao_exclusao(socio, var_selected):
+    """ Marca o sócio para exclusão ou não """
+    socio['selected'] = var_selected.get()
+    salvar_socios()  # Salva novamente após alteração de seleção
+
+# Função para limpar a lista de sócios selecionados
+def limpar_socios_selecionados():
+    global socios
+    # Filtra os sócios que não estão selecionados para exclusão
+    socios = [socio for socio in socios if not socio['selected']]
+    exibir_socios()  # Atualiza a interface com a lista filtrada
+    salvar_socios()  # Salva novamente no Excel
+
+    label_status.configure(text="Sócios selecionados foram excluídos!", text_color="green")
+
+# Função para atualizar o conteúdo do frame principal
+def atualizar_menu_rateio():
+    global campo_nome_socio, campo_porcentagem_socio, label_status, frame_socios  # Tornando essas variáveis globais
+    
+    # Limpa o conteúdo atual da área de conteúdo
+    for widget in frame_conteudo.winfo_children():
+        widget.destroy()
+
+    ctk.CTkLabel(frame_conteudo, text="Cadastro de Sócios e Rateio", font=("Arial", 18, "bold")).pack(pady=10)
+
+    # Campo para adicionar um novo sócio
+    ctk.CTkLabel(frame_conteudo, text="Nome do Sócio:").pack(pady=5)
+    campo_nome_socio = ctk.CTkEntry(frame_conteudo, placeholder_text="Nome do Sócio", width=300)
+    campo_nome_socio.pack(pady=5)
+    
+    ctk.CTkLabel(frame_conteudo, text="Porcentagem de Rateio:").pack(pady=5)
+    campo_porcentagem_socio = ctk.CTkEntry(frame_conteudo, placeholder_text="Porcentagem", width=300)
+    campo_porcentagem_socio.pack(pady=5)
+
+    # Botão para adicionar o sócio
+    ctk.CTkButton(frame_conteudo, text="Adicionar Sócio", command=adicionar_socio).pack(pady=10)
+
+    # Frame para exibir a lista de sócios
+    frame_socios = ctk.CTkFrame(frame_conteudo)
+    frame_socios.pack(pady=10, fill="x")
+
+    # Exibir os sócios atuais
+    exibir_socios()
+
+    # Botão para limpar os sócios selecionados
+    ctk.CTkButton(frame_conteudo, text="Limpar Sócios Selecionados", command=limpar_socios_selecionados).pack(pady=10)
+
+    # Status do processo
+    label_status = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
+    label_status.pack(pady=10)
 
 
 def atualizar_menu_categorias(tipo):
@@ -556,6 +685,9 @@ def atualizar_menu_categorias(tipo):
         
         label_status_excluir = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
         label_status_excluir.pack(pady=5)
+    
+
+    
 
 def salvar_lancamento_em_excel(tipo, valor, categoria, predio_destino):
     if not predio_destino:
@@ -696,6 +828,7 @@ def atualizar_lancamento(tipo):
 
 
 
+
 # Agora, nos botões, você chama a função de atualização de acordo com o tipo:
 ctk.CTkButton(frame_menu, text="Adicionar Categoria (Despesa)", command=lambda: atualizar_menu_categorias("adicionar_despesa"), width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Excluir Categoria (Despesa)", command=lambda: atualizar_menu_categorias("excluir_despesa"), width=180).pack(pady=10)
@@ -704,6 +837,9 @@ ctk.CTkButton(frame_menu, text="Excluir Categoria (Receita)", command=lambda: at
 ctk.CTkButton(frame_menu, text="Lançar Despesas", command=lambda: atualizar_lancamento("lancar_despesas"), width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Lançar Receitas", command=lambda: atualizar_lancamento("lancar_receitas"), width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Transferir Receita", command=lambda: atualizar_lancamento("transferir_receita"), width=180).pack(pady=10)
+ctk.CTkButton(frame_menu, text="Carregar Sócios", command=carregar_socios, width=180).pack(pady=10)
+ctk.CTkButton(frame_menu, text="Atualizar Rateio", command=atualizar_menu_rateio, width=180).pack(pady=10)
+
 
 # Área de conteúdo principal
 frame_conteudo = ctk.CTkFrame(root)
@@ -712,5 +848,11 @@ frame_conteudo.pack(side="right", fill="both", expand=True, padx=20, pady=20)
 label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
 label_predio.pack(pady=10)
 
+
+
+#LOGICA DE RATEIO ENTRE OS SOCIOS
+
+
 # Loop da aplicação
 root.mainloop()
+
