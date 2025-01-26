@@ -70,10 +70,10 @@ def lancar_despesas():
             if divida_percentual_1 and divida_percentual_2:
                 valor_gv = valor_float * float(divida_percentual_1) / 100
                 valor_jlp = valor_float * float(divida_percentual_2) / 100
-                salvar_em_excel("Despesa", categoria, valor_gv, inquilino, observacoes, divida_percentual_1, "GV")  # Salvar para o GV
-                salvar_em_excel("Despesa", categoria, valor_jlp, inquilino, observacoes, divida_percentual_2, "JLP")  # Salvar para o JLP
+                salvar_em_excel("Despesa", categoria, valor_gv, observacoes, divida_percentual_1, "GV")  # Salvar para o GV
+                salvar_em_excel("Despesa", categoria, valor_jlp, observacoes, divida_percentual_2, "JLP")  # Salvar para o JLP
             else:
-               salvar_em_excel("Despesa", categoria, valor_float, inquilino, observacoes, None, prédio_selecionado)
+               salvar_em_excel("Despesa", categoria, valor_float, observacoes, None, prédio_selecionado)
             label_status.configure(text=f"Despesa '{categoria}' de R${valor} salva!", text_color="green")
             campo_valor.delete(0, ctk.END)
             campo_inquilino.delete(0, ctk.END)
@@ -712,6 +712,8 @@ def salvar_lancamento_em_excel(tipo, valor, categoria, predio_destino):
     df_final.to_excel(nome_arquivo, index=False)
     print(f"{tipo} de R${valor} na categoria '{categoria}' salva em {nome_arquivo}!")
 
+import customtkinter as ctk
+
 def atualizar_lancamento(tipo):
     """ Atualiza o conteúdo da área principal com os campos para lançar despesas, receitas ou transferir receita """
     # Limpa o conteúdo atual da área de conteúdo
@@ -722,6 +724,7 @@ def atualizar_lancamento(tipo):
         label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
         label_predio.pack(pady=10)
         label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
+        
         ctk.CTkLabel(frame_conteudo, text="Lançar Despesas", font=("Arial", 18, "bold")).pack(pady=10)
         
         ctk.CTkLabel(frame_conteudo, text="Valor da Despesa:").pack(pady=5)
@@ -731,27 +734,86 @@ def atualizar_lancamento(tipo):
         ctk.CTkLabel(frame_conteudo, text="Categoria:").pack(pady=5)
         combo_categoria_despesa = ctk.CTkComboBox(frame_conteudo, values=categorias_despesas)
         combo_categoria_despesa.pack(pady=5)
+
+        # Checkbox para despesa dividida
+        dividir_despesa_var = ctk.BooleanVar()
+        check_dividir_despesa = ctk.CTkCheckBox(frame_conteudo, text="Despesa dividida entre os prédios?", variable=dividir_despesa_var)
+        check_dividir_despesa.pack(pady=5)
         
+        # Campos de porcentagem
+        frame_porcentagem = ctk.CTkFrame(frame_conteudo)
+        
+        ctk.CTkLabel(frame_porcentagem, text="GV (%):").pack(side="left", padx=5)
+        campo_porcentagem_gv = ctk.CTkEntry(frame_porcentagem, width=50)
+        campo_porcentagem_gv.pack(side="left", padx=5)
+
+        ctk.CTkLabel(frame_porcentagem, text="JLP (%):").pack(side="left", padx=5)
+        campo_porcentagem_jlp = ctk.CTkEntry(frame_porcentagem, width=50)
+        campo_porcentagem_jlp.pack(side="left", padx=5)
+
+        frame_porcentagem.pack(pady=5)
+        frame_porcentagem.pack_forget()  # Esconde o frame inicialmente
+
+        # Atualiza a visibilidade do campo de porcentagem
+        def toggle_campos_porcentagem():
+            if dividir_despesa_var.get():
+                frame_porcentagem.pack(pady=5)
+            else:
+                frame_porcentagem.pack_forget()
+
+        check_dividir_despesa.configure(command=toggle_campos_porcentagem)
+
         def salvar_despesa():
             valor = campo_valor_despesa.get().strip()
             categoria = combo_categoria_despesa.get()
-            
-            if valor and categoria:
-                # Chama a função para salvar a despesa no Excel
-                salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado)
-                label_status_lancamento.configure(text=f"Despesa de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!", text_color="green")
-            else:
+
+            if not valor or not categoria:
                 label_status_lancamento.configure(text="Preencha todos os campos corretamente.", text_color="red")
+                return
+            
+            valor = float(valor.replace(",", "."))  # Converte para número
+
+            if dividir_despesa_var.get():
+                try:
+                    porcentagem_gv = float(campo_porcentagem_gv.get().strip())
+                    porcentagem_jlp = float(campo_porcentagem_jlp.get().strip())
+
+                    if porcentagem_gv + porcentagem_jlp != 100:
+                        label_status_lancamento.configure(text="As porcentagens devem somar 100%.", text_color="red")
+                        return
+
+                    valor_gv = round(valor * (porcentagem_gv / 100), 2)
+                    valor_jlp = round(valor * (porcentagem_jlp / 100), 2)
+
+                    # Salva nos dois prédios com os valores divididos
+                    salvar_lancamento_em_excel("Despesa", valor_gv, categoria, "GV")
+                    salvar_lancamento_em_excel("Despesa", valor_jlp, categoria, "JLP")
+
+                    label_status_lancamento.configure(
+                        text=f"Despesa de R${valor} dividida entre os prédios: GV ({porcentagem_gv}%) e JLP ({porcentagem_jlp}%) registrada!",
+                        text_color="green"
+                    )
+                except ValueError:
+                    label_status_lancamento.configure(text="Insira valores válidos para as porcentagens.", text_color="red")
+                    return
+            else:
+                salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado)
+                label_status_lancamento.configure(
+                    text=f"Despesa de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!",
+                    text_color="green"
+                )
 
         ctk.CTkButton(frame_conteudo, text="Registrar Despesa", command=salvar_despesa).pack(pady=10)
-        
+
         label_status_lancamento = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
         label_status_lancamento.pack(pady=5)
+
 
     elif tipo == "lancar_receitas":
         label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
         label_predio.pack(pady=10)
         label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
+        
         ctk.CTkLabel(frame_conteudo, text="Lançar Receita", font=("Arial", 18, "bold")).pack(pady=10)
         
         ctk.CTkLabel(frame_conteudo, text="Valor da Receita:").pack(pady=5)
@@ -762,22 +824,79 @@ def atualizar_lancamento(tipo):
         combo_categoria_receita = ctk.CTkComboBox(frame_conteudo, values=categorias_receitas)
         combo_categoria_receita.pack(pady=5)
         
+        # Checkbox para dividir a receita
+        dividir_receita_var = ctk.BooleanVar()
+        check_dividir_receita = ctk.CTkCheckBox(frame_conteudo, text="Receita dividida entre os prédios?", variable=dividir_receita_var)
+        check_dividir_receita.pack(pady=5)
         
+        # Campos de porcentagem
+        frame_porcentagem = ctk.CTkFrame(frame_conteudo)
+        
+        ctk.CTkLabel(frame_porcentagem, text="GV (%):").pack(side="left", padx=5)
+        campo_porcentagem_gv = ctk.CTkEntry(frame_porcentagem, width=50)
+        campo_porcentagem_gv.pack(side="left", padx=5)
+
+        ctk.CTkLabel(frame_porcentagem, text="JLP (%):").pack(side="left", padx=5)
+        campo_porcentagem_jlp = ctk.CTkEntry(frame_porcentagem, width=50)
+        campo_porcentagem_jlp.pack(side="left", padx=5)
+
+        frame_porcentagem.pack(pady=5)
+        frame_porcentagem.pack_forget()  # Esconde o frame inicialmente
+
+        # Atualiza a visibilidade do campo de porcentagem
+        def toggle_campos_porcentagem():
+            if dividir_receita_var.get():
+                frame_porcentagem.pack(pady=5)
+            else:
+                frame_porcentagem.pack_forget()
+
+        check_dividir_receita.configure(command=toggle_campos_porcentagem)
+
         def salvar_receita():
             valor = campo_valor_receita.get().strip()
             categoria = combo_categoria_receita.get()
-            
-            if valor and categoria:
-                # Aqui, você pode adicionar o código para salvar a receita
-                label_status_lancamento.configure(text=f"Receita de R${valor} na categoria '{categoria}' registrada!", text_color="green")
-                salvar_lancamento_em_excel("Receita", valor, categoria, prédio_selecionado)
-            else:
+
+            if not valor or not categoria:
                 label_status_lancamento.configure(text="Preencha todos os campos corretamente.", text_color="red")
+                return
+            
+            valor = float(valor.replace(",", "."))  # Converte para número
+
+            if dividir_receita_var.get():
+                try:
+                    porcentagem_gv = float(campo_porcentagem_gv.get().strip())
+                    porcentagem_jlp = float(campo_porcentagem_jlp.get().strip())
+
+                    if porcentagem_gv + porcentagem_jlp != 100:
+                        label_status_lancamento.configure(text="As porcentagens devem somar 100%.", text_color="red")
+                        return
+
+                    valor_gv = round(valor * (porcentagem_gv / 100), 2)
+                    valor_jlp = round(valor * (porcentagem_jlp / 100), 2)
+
+                    # Salva nos dois prédios com os valores divididos
+                    salvar_lancamento_em_excel("Receita", valor_gv, categoria, "GV")
+                    salvar_lancamento_em_excel("Receita", valor_jlp, categoria, "JLP")
+
+                    label_status_lancamento.configure(
+                        text=f"Receita de R${valor} dividida entre os prédios: GV ({porcentagem_gv}%) e JLP ({porcentagem_jlp}%) registrada!",
+                        text_color="green"
+                    )
+                except ValueError:
+                    label_status_lancamento.configure(text="Insira valores válidos para as porcentagens.", text_color="red")
+                    return
+            else:
+                salvar_lancamento_em_excel("Receita", valor, categoria, prédio_selecionado)
+                label_status_lancamento.configure(
+                    text=f"Receita de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!",
+                    text_color="green"
+                )
 
         ctk.CTkButton(frame_conteudo, text="Registrar Receita", command=salvar_receita).pack(pady=10)
-        
+
         label_status_lancamento = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
         label_status_lancamento.pack(pady=5)
+
 
 
     elif tipo == "transferir_receita":
