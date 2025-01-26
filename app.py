@@ -945,6 +945,106 @@ def atualizar_lancamento(tipo):
         label_status = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
         label_status.pack(pady=5)
 
+#DASHBOARD
+import re  # Para validar o formato YYYY-MM
+
+def abrir_dashboard():
+    """ Abre o menu para selecionar o mês e o prédio para exibir o dashboard """
+    for widget in frame_conteudo.winfo_children():
+        widget.destroy()
+
+    ctk.CTkLabel(frame_conteudo, text="Selecionar Balancete", font=("Arial", 18, "bold")).pack(pady=10)
+
+    ctk.CTkLabel(frame_conteudo, text="Digite o mês e ano (YYYY-MM):").pack(pady=5)
+    campo_mes_ano = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 2025-01", width=200)
+    campo_mes_ano.pack(pady=5)
+
+    ctk.CTkLabel(frame_conteudo, text="Selecione o prédio:").pack(pady=5)
+    combo_predio = ctk.CTkComboBox(frame_conteudo, values=["GV", "JLP"])
+    combo_predio.pack(pady=5)
+
+    def carregar_balancete():
+        mes_ano = campo_mes_ano.get().strip()
+        predio = combo_predio.get()
+
+        # Validação do formato YYYY-MM
+        if not re.match(r"^\d{4}-\d{2}$", mes_ano):
+            messagebox.showwarning("Erro", "Formato inválido! Use YYYY-MM.")
+            return
+        
+        # Definir os nomes dos arquivos
+        arquivo_predio = f"{predio}_{mes_ano}.xlsx"
+        outro_predio = "GV" if predio == "JLP" else "JLP"
+        arquivo_outro_predio = f"{outro_predio}_{mes_ano}.xlsx"
+        arquivo_transferencias = "transferencias.xlsx"
+
+        # Verificar se os arquivos existem
+        arquivos_faltando = [arq for arq in [arquivo_predio, arquivo_outro_predio, arquivo_transferencias] if not os.path.exists(arq)]
+        if arquivos_faltando:
+            messagebox.showwarning("Erro", f"Os seguintes arquivos não foram encontrados:\n" + "\n".join(arquivos_faltando))
+            return
+
+        # Se tudo estiver ok, exibir os dados no dashboard
+        exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arquivo_transferencias)
+
+    ctk.CTkButton(frame_conteudo, text="Carregar Balancete", command=carregar_balancete).pack(pady=10)
+
+    label_status = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
+    label_status.pack(pady=5)
+
+
+def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arquivo_transferencias):
+    """ Exibe o balancete com base nos arquivos Excel """
+    for widget in frame_conteudo.winfo_children():
+        widget.destroy()
+    
+    ctk.CTkLabel(frame_conteudo, text=f"Balancete - {predio} ({mes_ano})", font=("Arial", 18, "bold")).pack(pady=10)
+    
+    try:
+        # Carregar os arquivos Excel com header correto
+        df_predio = pd.read_excel(arquivo_predio, header=0)
+        df_transferencias = pd.read_excel(arquivo_transferencias, header=0)
+
+        # Normalizar nomes das colunas (remover espaços extras, se houver)
+        df_predio.columns = df_predio.columns.str.strip()
+        df_transferencias.columns = df_transferencias.columns.str.strip()
+
+        # Converter valores para float (evita erro de soma)
+        df_predio["Valor"] = pd.to_numeric(df_predio["Valor"], errors="coerce").fillna(0)
+        df_transferencias["Valor"] = pd.to_numeric(df_transferencias["Valor"], errors="coerce").fillna(0)
+
+        # Calcular totais de receita e despesa
+        receita_total = df_predio[df_predio["Tipo"].str.upper() == "RECEITA"]["Valor"].sum()
+        despesa_total = df_predio[df_predio["Tipo"].str.upper() == "DESPESA"]["Valor"].sum()
+        saldo_final = receita_total - despesa_total
+
+        # Exibir resumo financeiro
+        ctk.CTkLabel(frame_conteudo, text=f"Receita Total: R${receita_total:,.2f}", font=("Arial", 14)).pack(pady=5)
+        ctk.CTkLabel(frame_conteudo, text=f"Despesa Total: R${despesa_total:,.2f}", font=("Arial", 14)).pack(pady=5)
+        ctk.CTkLabel(frame_conteudo, text=f"Saldo Final: R${saldo_final:,.2f}", font=("Arial", 16, "bold"), 
+                     text_color="green" if saldo_final >= 0 else "red").pack(pady=10)
+
+        # Filtrar transferências do período
+        df_transferencias["Data"] = pd.to_datetime(df_transferencias["Data"], dayfirst=True, errors="coerce")
+        df_transferencias_filtradas = df_transferencias[df_transferencias["Data"].dt.strftime("%Y-%m") == mes_ano]
+        df_transferencias_filtradas = df_transferencias_filtradas[
+            (df_transferencias_filtradas["Origem"] == predio) | (df_transferencias_filtradas["Destino"] == predio)
+        ]
+
+        # Exibir transferências
+        if not df_transferencias_filtradas.empty:
+            ctk.CTkLabel(frame_conteudo, text="Transferências no período:", font=("Arial", 14, "bold")).pack(pady=10)
+            for _, row in df_transferencias_filtradas.iterrows():
+                ctk.CTkLabel(frame_conteudo, text=f"{row['Origem']} transferiu R${row['Valor']:,.2f} para {row['Destino']}",
+                             font=("Arial", 12)).pack(pady=2)
+        else:
+            ctk.CTkLabel(frame_conteudo, text="Nenhuma transferência registrada.", font=("Arial", 12)).pack(pady=5)
+
+    except FileNotFoundError:
+        messagebox.showwarning("Arquivo não encontrado", f"O arquivo do mês {mes_ano} não foi encontrado.")
+    except Exception as e:
+        messagebox.showerror("Erro", f"Ocorreu um erro ao carregar o balancete:\n{str(e)}")
+
 
 
 
@@ -958,6 +1058,8 @@ ctk.CTkButton(frame_menu, text="Lançar Receitas", command=lambda: atualizar_lan
 ctk.CTkButton(frame_menu, text="Transferir Receita", command=lambda: atualizar_lancamento("transferir_receita"), width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Carregar Sócios", command=carregar_socios, width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Atualizar Rateio", command=atualizar_menu_rateio, width=180).pack(pady=10)
+btn_dashboard = ctk.CTkButton(frame_menu, text="Visualizar Dashboard", command=abrir_dashboard, width=180).pack(pady=10)
+
 
 
 # Área de conteúdo principal
