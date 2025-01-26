@@ -948,6 +948,11 @@ def atualizar_lancamento(tipo):
 #DASHBOARD
 import re  # Para validar o formato YYYY-MM
 
+import os
+import re
+import customtkinter as ctk
+from tkinter import messagebox
+
 def abrir_dashboard():
     """ Abre o menu para selecionar o mês e o prédio para exibir o dashboard """
     for widget in frame_conteudo.winfo_children():
@@ -977,15 +982,16 @@ def abrir_dashboard():
         outro_predio = "GV" if predio == "JLP" else "JLP"
         arquivo_outro_predio = f"{outro_predio}_{mes_ano}.xlsx"
         arquivo_transferencias = "transferencias.xlsx"
+        arquivo_socios = f"socios.xlsx"  # Adicionando arquivo dos sócios
 
         # Verificar se os arquivos existem
-        arquivos_faltando = [arq for arq in [arquivo_predio, arquivo_outro_predio, arquivo_transferencias] if not os.path.exists(arq)]
+        arquivos_faltando = [arq for arq in [arquivo_predio, arquivo_outro_predio, arquivo_transferencias, arquivo_socios] if not os.path.exists(arq)]
         if arquivos_faltando:
             messagebox.showwarning("Erro", f"Os seguintes arquivos não foram encontrados:\n" + "\n".join(arquivos_faltando))
             return
 
         # Se tudo estiver ok, exibir os dados no dashboard
-        exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arquivo_transferencias)
+        exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arquivo_transferencias, arquivo_socios)
 
     ctk.CTkButton(frame_conteudo, text="Carregar Balancete", command=carregar_balancete).pack(pady=10)
 
@@ -993,30 +999,45 @@ def abrir_dashboard():
     label_status.pack(pady=5)
 
 
-def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arquivo_transferencias):
+import pandas as pd
+import customtkinter as ctk
+from tkinter import messagebox, simpledialog
+
+import pandas as pd
+import os
+import customtkinter as ctk
+from tkinter import messagebox
+
+def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arquivo_transferencias, arquivo_socios):
     """ Exibe o balancete com base nos arquivos Excel """
     for widget in frame_conteudo.winfo_children():
         widget.destroy()
-    
+
     ctk.CTkLabel(frame_conteudo, text=f"Balancete - {predio} ({mes_ano})", font=("Arial", 18, "bold")).pack(pady=10)
     
     try:
-        # Carregar os arquivos Excel com header correto
+        # Carregar os arquivos Excel
         df_predio = pd.read_excel(arquivo_predio, header=0)
         df_transferencias = pd.read_excel(arquivo_transferencias, header=0)
+        df_socios = pd.read_excel(arquivo_socios, header=0)
 
-        # Normalizar nomes das colunas (remover espaços extras, se houver)
-        df_predio.columns = df_predio.columns.str.strip()
-        df_transferencias.columns = df_transferencias.columns.str.strip()
+        # Normalizar nomes das colunas
+        df_predio.columns = df_predio.columns.str.strip().str.title()
+        df_transferencias.columns = df_transferencias.columns.str.strip().str.title()
+        df_socios.columns = df_socios.columns.str.strip().str.title()
 
-        # Converter valores para float (evita erro de soma)
+        # Converter valores para float
         df_predio["Valor"] = pd.to_numeric(df_predio["Valor"], errors="coerce").fillna(0)
         df_transferencias["Valor"] = pd.to_numeric(df_transferencias["Valor"], errors="coerce").fillna(0)
+        df_socios["Porcentagem"] = pd.to_numeric(df_socios["Porcentagem"], errors="coerce").fillna(0) / 100
 
         # Calcular totais de receita e despesa
         receita_total = df_predio[df_predio["Tipo"].str.upper() == "RECEITA"]["Valor"].sum()
         despesa_total = df_predio[df_predio["Tipo"].str.upper() == "DESPESA"]["Valor"].sum()
         saldo_final = receita_total - despesa_total
+
+        # Inicializar saldo_restante com o saldo final
+        saldo_restante = saldo_final
 
         # Exibir resumo financeiro
         ctk.CTkLabel(frame_conteudo, text=f"Receita Total: R${receita_total:,.2f}", font=("Arial", 14)).pack(pady=5)
@@ -1024,10 +1045,10 @@ def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arqu
         ctk.CTkLabel(frame_conteudo, text=f"Saldo Final: R${saldo_final:,.2f}", font=("Arial", 16, "bold"), 
                      text_color="green" if saldo_final >= 0 else "red").pack(pady=10)
 
-        # Filtrar transferências do período
+        # Exibir transferências
         df_transferencias["Data"] = pd.to_datetime(df_transferencias["Data"], dayfirst=True, errors="coerce")
         df_transferencias_filtradas = df_transferencias[df_transferencias["Data"].dt.strftime("%Y-%m") == mes_ano]
-        df_transferencias_filtradas = df_transferencias_filtradas[
+        df_transferencias_filtradas = df_transferencias_filtradas[ 
             (df_transferencias_filtradas["Origem"] == predio) | (df_transferencias_filtradas["Destino"] == predio)
         ]
 
@@ -1040,11 +1061,87 @@ def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arqu
         else:
             ctk.CTkLabel(frame_conteudo, text="Nenhuma transferência registrada.", font=("Arial", 12)).pack(pady=5)
 
+        # 🔹 PERGUNTAR QUANTO SERÁ DISTRIBUÍDO 🔹
+        if saldo_final > 0:
+            # Criar interface bonita para a entrada de valor
+            distribui_frame = ctk.CTkFrame(frame_conteudo)
+            distribui_frame.pack(pady=10)
+
+            ctk.CTkLabel(distribui_frame, text="Quanto deseja distribuir?", font=("Arial", 14)).pack(pady=5)
+
+            valor_distribuicao_entry = ctk.CTkEntry(distribui_frame, placeholder_text=f"Saldo Final: R${saldo_final:,.2f}")
+            valor_distribuicao_entry.pack(pady=5)
+
+            def confirmar_distribuicao():
+                try:
+                    valor_distribuicao = float(valor_distribuicao_entry.get())
+                    if 0 < valor_distribuicao <= saldo_final:
+                        # Filtrar sócios do prédio atual
+                        socios_predio = df_socios[df_socios["Prédio"] == predio]
+
+                        if not socios_predio.empty:
+                            ctk.CTkLabel(frame_conteudo, text="Distribuição entre sócios:", font=("Arial", 14, "bold")).pack(pady=10)
+
+                            # Exibir os sócios em formato de "tabela"
+                            header_frame = ctk.CTkFrame(frame_conteudo)
+                            header_frame.pack(pady=5)
+
+                            ctk.CTkLabel(header_frame, text="Nome", width=20).pack(side="left", padx=10)
+                            ctk.CTkLabel(header_frame, text="Porcentagem", width=20).pack(side="left", padx=10)
+                            ctk.CTkLabel(header_frame, text="Valor a Receber", width=20).pack(side="left", padx=10)
+
+                            for _, row in socios_predio.iterrows():
+                                socio_frame = ctk.CTkFrame(frame_conteudo)
+                                socio_frame.pack(pady=5)
+
+                                ctk.CTkLabel(socio_frame, text=row['Nome'], width=20).pack(side="left", padx=10)
+                                ctk.CTkLabel(socio_frame, text=f"{row['Porcentagem'] * 100:.2f}%", width=20).pack(side="left", padx=10)
+                                valor_socio = valor_distribuicao * row["Porcentagem"]
+                                ctk.CTkLabel(socio_frame, text=f"R${valor_socio:,.2f}", width=20).pack(side="left", padx=10)
+
+                            saldo_restante = saldo_final - valor_distribuicao
+                            ctk.CTkLabel(frame_conteudo, text=f"Saldo restante: R${saldo_restante:,.2f}", font=("Arial", 14, "bold"), text_color="blue").pack(pady=10)
+
+                            # Atualizar saldo inicial no arquivo do próximo mês
+                            mes_ano_proximo = (pd.to_datetime(mes_ano, format="%Y-%m") + pd.DateOffset(months=1)).strftime("%Y-%m")
+                            arquivo_proximo_mes = f"{predio}_{mes_ano_proximo}.xlsx"
+                            
+                            # Criar ou atualizar o arquivo do próximo mês com a estrutura solicitada
+                            if not os.path.exists(arquivo_proximo_mes):
+                                # Criar um novo arquivo Excel para o próximo mês com a estrutura correta
+                                novo_df = pd.DataFrame({
+                                    "Tipo": ["Saldo Inicial"],
+                                    "Categoria": ["Inicial"],  # Definir categoria como "Inicial"
+                                    "Valor": [saldo_restante],
+                                    "Data": [pd.to_datetime(f"{mes_ano_proximo}-01")],  # Data do primeiro dia do próximo mês
+                                    "Saldo Inicial": [saldo_restante]  # Coluna de saldo inicial
+                                })
+                                novo_df.to_excel(arquivo_proximo_mes, index=False)
+                            else:
+                                # Atualizar o saldo inicial no arquivo existente
+                                df_proximo_mes = pd.read_excel(arquivo_proximo_mes, header=0)
+                                df_proximo_mes.columns = df_proximo_mes.columns.str.strip().str.title()
+                                if df_proximo_mes.shape[1] > 4:
+                                    df_proximo_mes.iloc[0, 4] = saldo_restante
+                                    df_proximo_mes.to_excel(arquivo_proximo_mes, index=False)
+
+                            # Exibir messagebox com saldo restante passado para o próximo mês
+                            messagebox.showinfo("Saldo Inicial", f"O saldo inicial de {predio} para o próximo mês ({mes_ano_proximo}) é R${saldo_restante:,.2f}.")
+                        else:
+                            ctk.CTkLabel(frame_conteudo, text="Nenhum sócio cadastrado para este prédio.", font=("Arial", 12)).pack(pady=5)
+                    else:
+                        messagebox.showwarning("Valor inválido", f"O valor a ser distribuído deve ser entre 0 e R${saldo_final:,.2f}")
+                except ValueError:
+                    messagebox.showwarning("Valor inválido", "Por favor, insira um valor numérico válido.")
+
+            # Botão de confirmação
+            confirmar_btn = ctk.CTkButton(distribui_frame, text="Confirmar Distribuição", command=confirmar_distribuicao)
+            confirmar_btn.pack(pady=10)
+
     except FileNotFoundError:
         messagebox.showwarning("Arquivo não encontrado", f"O arquivo do mês {mes_ano} não foi encontrado.")
     except Exception as e:
         messagebox.showerror("Erro", f"Ocorreu um erro ao carregar o balancete:\n{str(e)}")
-
 
 
 
