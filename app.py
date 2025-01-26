@@ -1034,7 +1034,10 @@ def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arqu
         # Calcular totais de receita e despesa
         receita_total = df_predio[df_predio["Tipo"].str.upper() == "RECEITA"]["Valor"].sum()
         despesa_total = df_predio[df_predio["Tipo"].str.upper() == "DESPESA"]["Valor"].sum()
-        saldo_final = receita_total - despesa_total
+        
+        # Verificar se há um "Saldo Inicial" no mês anterior (coluna 5)
+        saldo_inicial = df_predio.iloc[0, 4] if df_predio.shape[1] > 4 else 0
+        saldo_final = receita_total - despesa_total + saldo_inicial
 
         # Inicializar saldo_restante com o saldo final
         saldo_restante = saldo_final
@@ -1042,6 +1045,7 @@ def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arqu
         # Exibir resumo financeiro
         ctk.CTkLabel(frame_conteudo, text=f"Receita Total: R${receita_total:,.2f}", font=("Arial", 14)).pack(pady=5)
         ctk.CTkLabel(frame_conteudo, text=f"Despesa Total: R${despesa_total:,.2f}", font=("Arial", 14)).pack(pady=5)
+        ctk.CTkLabel(frame_conteudo, text=f"Saldo Inicial: R${saldo_inicial:,.2f}", font=("Arial", 14), text_color="blue").pack(pady=10)
         ctk.CTkLabel(frame_conteudo, text=f"Saldo Final: R${saldo_final:,.2f}", font=("Arial", 16, "bold"), 
                      text_color="green" if saldo_final >= 0 else "red").pack(pady=10)
 
@@ -1061,8 +1065,39 @@ def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arqu
         else:
             ctk.CTkLabel(frame_conteudo, text="Nenhuma transferência registrada.", font=("Arial", 12)).pack(pady=5)
 
-        # 🔹 PERGUNTAR QUANTO SERÁ DISTRIBUÍDO 🔹
-        if saldo_final > 0:
+        # Verificar se o saldo é negativo e perguntar ao usuário
+        if saldo_final < 0:
+            ctk.CTkLabel(frame_conteudo, text="Saldo negativo! Deseja usar esse saldo como saldo inicial para o próximo mês?", font=("Arial", 14, "bold")).pack(pady=10)
+            distribui_frame = ctk.CTkFrame(frame_conteudo)
+            distribui_frame.pack(pady=10)
+
+            def confirmar_distribuicao_negativa():
+                # Atualizar saldo inicial no arquivo do próximo mês com saldo negativo
+                mes_ano_proximo = (pd.to_datetime(mes_ano, format="%Y-%m") + pd.DateOffset(months=1)).strftime("%Y-%m")
+                arquivo_proximo_mes = f"{predio}_{mes_ano_proximo}.xlsx"
+                
+                if not os.path.exists(arquivo_proximo_mes):
+                    novo_df = pd.DataFrame({
+                        "Tipo": ["Saldo Inicial"],
+                        "Categoria": ["Inicial"],
+                        "Valor": [saldo_restante],
+                        "Data": [pd.to_datetime(f"{mes_ano_proximo}-01")],
+                        "Saldo Inicial": [saldo_restante]
+                    })
+                    novo_df.to_excel(arquivo_proximo_mes, index=False)
+                else:
+                    df_proximo_mes = pd.read_excel(arquivo_proximo_mes, header=0)
+                    df_proximo_mes.columns = df_proximo_mes.columns.str.strip().str.title()
+                    if df_proximo_mes.shape[1] > 4:
+                        df_proximo_mes.iloc[0, 4] = saldo_restante
+                        df_proximo_mes.to_excel(arquivo_proximo_mes, index=False)
+
+                messagebox.showinfo("Saldo Inicial", f"O saldo inicial de {predio} para o próximo mês ({mes_ano_proximo}) é R${saldo_restante:,.2f}.")
+            
+            ctk.CTkButton(distribui_frame, text="Confirmar Transferência de Saldo Negativo", command=confirmar_distribuicao_negativa).pack(pady=5)
+
+        # Caso o saldo seja positivo, exibe a opção de distribuir entre os sócios
+        elif saldo_final > 0:
             # Criar interface bonita para a entrada de valor
             distribui_frame = ctk.CTkFrame(frame_conteudo)
             distribui_frame.pack(pady=10)
@@ -1108,40 +1143,34 @@ def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arqu
                             
                             # Criar ou atualizar o arquivo do próximo mês com a estrutura solicitada
                             if not os.path.exists(arquivo_proximo_mes):
-                                # Criar um novo arquivo Excel para o próximo mês com a estrutura correta
                                 novo_df = pd.DataFrame({
                                     "Tipo": ["Saldo Inicial"],
-                                    "Categoria": ["Inicial"],  # Definir categoria como "Inicial"
+                                    "Categoria": ["Inicial"],
                                     "Valor": [saldo_restante],
-                                    "Data": [pd.to_datetime(f"{mes_ano_proximo}-01")],  # Data do primeiro dia do próximo mês
-                                    "Saldo Inicial": [saldo_restante]  # Coluna de saldo inicial
+                                    "Data": [pd.to_datetime(f"{mes_ano_proximo}-01")],
+                                    "Saldo Inicial": [saldo_restante]
                                 })
                                 novo_df.to_excel(arquivo_proximo_mes, index=False)
                             else:
-                                # Atualizar o saldo inicial no arquivo existente
                                 df_proximo_mes = pd.read_excel(arquivo_proximo_mes, header=0)
                                 df_proximo_mes.columns = df_proximo_mes.columns.str.strip().str.title()
                                 if df_proximo_mes.shape[1] > 4:
                                     df_proximo_mes.iloc[0, 4] = saldo_restante
                                     df_proximo_mes.to_excel(arquivo_proximo_mes, index=False)
 
-                            # Exibir messagebox com saldo restante passado para o próximo mês
                             messagebox.showinfo("Saldo Inicial", f"O saldo inicial de {predio} para o próximo mês ({mes_ano_proximo}) é R${saldo_restante:,.2f}.")
                         else:
                             ctk.CTkLabel(frame_conteudo, text="Nenhum sócio cadastrado para este prédio.", font=("Arial", 12)).pack(pady=5)
                     else:
                         messagebox.showwarning("Valor inválido", f"O valor a ser distribuído deve ser entre 0 e R${saldo_final:,.2f}")
                 except ValueError:
-                    messagebox.showwarning("Valor inválido", "Por favor, insira um valor numérico válido.")
+                    messagebox.showwarning("Valor inválido", "Por favor, insira um valor válido para distribuição.")
 
-            # Botão de confirmação
-            confirmar_btn = ctk.CTkButton(distribui_frame, text="Confirmar Distribuição", command=confirmar_distribuicao)
-            confirmar_btn.pack(pady=10)
+            ctk.CTkButton(distribui_frame, text="Confirmar Distribuição", command=confirmar_distribuicao).pack(pady=5)
 
-    except FileNotFoundError:
-        messagebox.showwarning("Arquivo não encontrado", f"O arquivo do mês {mes_ano} não foi encontrado.")
     except Exception as e:
-        messagebox.showerror("Erro", f"Ocorreu um erro ao carregar o balancete:\n{str(e)}")
+        messagebox.showerror("Erro", f"Ocorreu um erro ao carregar os arquivos: {e}")
+
 
 
 
