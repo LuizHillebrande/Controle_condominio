@@ -686,6 +686,152 @@ def atualizar_menu_categorias(tipo):
         label_status_excluir = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
         label_status_excluir.pack(pady=5)
     
+#INQUILINOS
+
+import customtkinter as ctk
+from tkinter import messagebox
+
+# Lista de inquilinos cadastrados (essa estrutura pode ser substituída por um banco de dados ou arquivo)
+inquilinos = []
+
+def carregar_inquilinos():
+    try:
+        # Carregar o arquivo Excel com os inquilinos
+        df_inquilinos = pd.read_excel("inquilinos.xlsx")
+
+        # Exibir os nomes das colunas para verificar se 'nome' e 'valor_aluguel' estão corretos
+        print("Colunas disponíveis no arquivo:", df_inquilinos.columns)
+
+        # Limpar espaços extras nas colunas, se houver
+        df_inquilinos.columns = df_inquilinos.columns.str.strip()
+
+        # Carregar os inquilinos na lista
+        inquilinos.clear()  # Limpa a lista de inquilinos antes de adicionar os dados
+        for _, row in df_inquilinos.iterrows():
+            # Usar as colunas 'nome' e 'valor_aluguel' corretamente
+            inquilinos.append({"nome": row["nome"], "valor_aluguel": row["valor_aluguel"]})
+
+    except Exception as e:
+        print(f"Erro ao carregar inquilinos: {e}")
+
+# Chama a função para carregar os inquilinos
+carregar_inquilinos()
+
+# Função para adicionar ou editar inquilino
+def salvar_inquilino():
+    nome_inquilino = campo_nome_inquilino.get().strip()
+    valor_aluguel = campo_valor_aluguel.get().strip()
+
+    if not nome_inquilino or not valor_aluguel:
+        messagebox.showerror("Erro", "Preencha todos os campos.")
+        return
+
+    try:
+        valor_aluguel = float(valor_aluguel.replace(",", "."))
+    except ValueError:
+        messagebox.showerror("Erro", "Valor do aluguel inválido.")
+        return
+
+    inquilinos.append({"nome": nome_inquilino, "valor_aluguel": valor_aluguel})
+
+    # Salvar o novo inquilino no arquivo Excel
+    df_inquilinos = pd.DataFrame(inquilinos)  # Convertendo a lista de inquilinos para DataFrame
+    df_inquilinos.to_excel("inquilinos.xlsx", index=False)
+
+    messagebox.showinfo("Sucesso", f"Inquilino {nome_inquilino} cadastrado com sucesso!")
+
+    # Limpar os campos após salvar
+    campo_nome_inquilino.delete(0, 'end')
+    campo_valor_aluguel.delete(0, 'end')
+    
+# Função para exibir o formulário de cadastro de inquilino
+def exibir_formulario_cadastro_inquilino():
+    # Limpar o conteúdo anterior do frame
+    for widget in frame_conteudo.winfo_children():
+        widget.destroy()
+
+    # Título do formulário
+    ctk.CTkLabel(frame_conteudo, text="Cadastro de Inquilino", font=("Arial", 18, "bold")).pack(pady=10)
+
+    # Campo para nome do inquilino
+    ctk.CTkLabel(frame_conteudo, text="Nome do Inquilino:").pack(pady=5)
+    global campo_nome_inquilino
+    campo_nome_inquilino = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: João Silva", width=250)
+    campo_nome_inquilino.pack(pady=5)
+
+    # Campo para valor do aluguel
+    ctk.CTkLabel(frame_conteudo, text="Valor do Aluguel:").pack(pady=5)
+    global campo_valor_aluguel
+    campo_valor_aluguel = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 1500,00", width=250)
+    campo_valor_aluguel.pack(pady=5)
+
+    # Botão para salvar o cadastro do inquilino
+    ctk.CTkButton(frame_conteudo, text="Salvar Inquilino", command=salvar_inquilino).pack(pady=10)
+
+# Função para selecionar um inquilino do combo
+def selecionar_inquilino():
+    inquilino_selecionado = combo_inquilinos.get()
+    for inquilino in inquilinos:
+        if inquilino["nome"] == inquilino_selecionado:
+            campo_valor_atual_aluguel.delete(0, 'end')
+            campo_valor_atual_aluguel.insert(0, f"R${inquilino['valor_aluguel']:.2f}")
+            break
+
+# Função para alterar o valor do aluguel
+
+def alterar_valor_aluguel():
+    inquilino_selecionado = combo_inquilinos.get()
+    novo_valor = campo_valor_atual_aluguel.get().strip()
+
+    if not novo_valor:
+        messagebox.showerror("Erro", "Informe o novo valor do aluguel.")
+        return
+
+    try:
+        novo_valor = float(novo_valor.replace(",", "."))
+    except ValueError:
+        messagebox.showerror("Erro", "Valor inválido.")
+        return
+
+    # Atualizar o valor do aluguel do inquilino selecionado
+    for inquilino in inquilinos:
+        if inquilino["nome"] == inquilino_selecionado:  # Usar 'nome' (minúsculo)
+            inquilino["valor_aluguel"] = novo_valor
+            messagebox.showinfo("Sucesso", f"Valor do aluguel de {inquilino_selecionado} alterado com sucesso!")
+            break
+
+    # Salvar os inquilinos atualizados no arquivo Excel
+    df_inquilinos = pd.DataFrame(inquilinos)  # Convertendo a lista de inquilinos para DataFrame
+    df_inquilinos.to_excel("inquilinos.xlsx", index=False)
+
+# Função para exibir o formulário de alteração do aluguel
+def exibir_formulario_alteracao_aluguel():
+    # Limpar o conteúdo anterior do frame
+    for widget in frame_conteudo.winfo_children():
+        widget.destroy()
+
+    # Título do formulário
+    ctk.CTkLabel(frame_conteudo, text="Alterar Aluguel do Inquilino", font=("Arial", 18, "bold")).pack(pady=10)
+
+    # ComboBox para selecionar o inquilino
+    ctk.CTkLabel(frame_conteudo, text="Selecionar Inquilino:").pack(pady=5)
+    global combo_inquilinos
+    combo_inquilinos = ctk.CTkComboBox(frame_conteudo, values=[inquilino["nome"] for inquilino in inquilinos])
+    combo_inquilinos.pack(pady=5)
+
+    # Botão para carregar o valor atual do aluguel
+    ctk.CTkButton(frame_conteudo, text="Carregar Valor Atual", command=selecionar_inquilino).pack(pady=5)
+
+    # Campo para alterar o valor do aluguel
+    ctk.CTkLabel(frame_conteudo, text="Novo Valor do Aluguel:").pack(pady=5)
+    global campo_valor_atual_aluguel
+    campo_valor_atual_aluguel = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 1600,00", width=250)
+    campo_valor_atual_aluguel.pack(pady=5)
+
+    # Botão para alterar o valor do aluguel
+    ctk.CTkButton(frame_conteudo, text="Alterar Aluguel", command=alterar_valor_aluguel).pack(pady=10)
+
+
 
     
 
@@ -1185,6 +1331,8 @@ ctk.CTkButton(frame_menu, text="Transferir Receita", command=lambda: atualizar_l
 ctk.CTkButton(frame_menu, text="Carregar Sócios", command=carregar_socios, width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Atualizar Rateio", command=atualizar_menu_rateio, width=180).pack(pady=10)
 btn_dashboard = ctk.CTkButton(frame_menu, text="Visualizar Dashboard", command=abrir_dashboard, width=180).pack(pady=10)
+ctk.CTkButton(frame_menu, text="Cadastrar Novo Inquilino", command=exibir_formulario_cadastro_inquilino, width=180).pack(pady=10)
+ctk.CTkButton(frame_menu, text="Alterar Aluguel", command=exibir_formulario_alteracao_aluguel, width=180).pack(pady=10)
 
 
 
