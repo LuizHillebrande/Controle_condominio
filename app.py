@@ -694,28 +694,33 @@ from tkinter import messagebox
 # Lista de inquilinos cadastrados (essa estrutura pode ser substituída por um banco de dados ou arquivo)
 inquilinos = []
 
+# Função para carregar os inquilinos do arquivo Excel
 def carregar_inquilinos():
     try:
         # Carregar o arquivo Excel com os inquilinos
         df_inquilinos = pd.read_excel("inquilinos.xlsx")
 
-        # Exibir os nomes das colunas para verificar se 'nome' e 'valor_aluguel' estão corretos
-        print("Colunas disponíveis no arquivo:", df_inquilinos.columns)
-
-        # Limpar espaços extras nas colunas, se houver
+        # Limpar espaços extras nas colunas
         df_inquilinos.columns = df_inquilinos.columns.str.strip()
 
-        # Carregar os inquilinos na lista
-        inquilinos.clear()  # Limpa a lista de inquilinos antes de adicionar os dados
+        # Verificar se o arquivo tem as colunas esperadas
+        if 'nome' not in df_inquilinos.columns or 'valor_aluguel' not in df_inquilinos.columns:
+            print("Colunas 'nome' ou 'valor_aluguel' não encontradas no arquivo.")
+            return
+        
+        # Limpar lista de inquilinos
+        inquilinos.clear()
+        
+        # Preencher a lista com os dados do Excel
         for _, row in df_inquilinos.iterrows():
-            # Usar as colunas 'nome' e 'valor_aluguel' corretamente
             inquilinos.append({"nome": row["nome"], "valor_aluguel": row["valor_aluguel"]})
+
+        # Verificar se a lista foi carregada corretamente
+        print("Inquilinos carregados:", inquilinos)
 
     except Exception as e:
         print(f"Erro ao carregar inquilinos: {e}")
 
-# Chama a função para carregar os inquilinos
-carregar_inquilinos()
 
 # Função para adicionar ou editar inquilino
 def salvar_inquilino():
@@ -835,7 +840,7 @@ def exibir_formulario_alteracao_aluguel():
 
     
 
-def salvar_lancamento_em_excel(tipo, valor, categoria, predio_destino):
+def salvar_lancamento_em_excel(tipo, valor, categoria, predio_destino, inquilino, saldo_inicial):
     if not predio_destino:
         return
     
@@ -843,9 +848,9 @@ def salvar_lancamento_em_excel(tipo, valor, categoria, predio_destino):
     mes_atual = datetime.now().strftime("%Y-%m")
     nome_arquivo = f"{predio_destino}_{mes_atual}.xlsx"
     
-    # Adicionar as informações do lançamento (valor, categoria e data)
-    novo_dado = pd.DataFrame([[tipo, categoria, float(valor), datetime.now().strftime("%d/%m/%Y")]], 
-                             columns=["Tipo", "Categoria", "Valor", "Data"])
+    # Adicionar as informações do lançamento (valor, categoria, data, inquilino e saldo inicial)
+    novo_dado = pd.DataFrame([[tipo, categoria, float(valor), datetime.now().strftime("%d/%m/%Y"), saldo_inicial, inquilino]], 
+                             columns=["Tipo", "Categoria", "Valor", "Data", "Saldo Inicial", "Inquilino"])
     
     # Verificar se o arquivo já existe
     if os.path.exists(nome_arquivo):
@@ -857,6 +862,7 @@ def salvar_lancamento_em_excel(tipo, valor, categoria, predio_destino):
     # Salvar no Excel
     df_final.to_excel(nome_arquivo, index=False)
     print(f"{tipo} de R${valor} na categoria '{categoria}' salva em {nome_arquivo}!")
+
 
 import customtkinter as ctk
 
@@ -932,8 +938,10 @@ def atualizar_lancamento(tipo):
                     valor_jlp = round(valor * (porcentagem_jlp / 100), 2)
 
                     # Salva nos dois prédios com os valores divididos
-                    salvar_lancamento_em_excel("Despesa", valor_gv, categoria, "GV")
-                    salvar_lancamento_em_excel("Despesa", valor_jlp, categoria, "JLP")
+                    # Modificando a chamada para incluir "Não existe" no lugar do inquilino
+                    salvar_lancamento_em_excel("Despesa", valor_gv, categoria, "GV", " ", 0)
+                    salvar_lancamento_em_excel("Despesa", valor_jlp, categoria, "JLP", " ", 0)
+
 
                     label_status_lancamento.configure(
                         text=f"Despesa de R${valor} dividida entre os prédios: GV ({porcentagem_gv}%) e JLP ({porcentagem_jlp}%) registrada!",
@@ -943,7 +951,7 @@ def atualizar_lancamento(tipo):
                     label_status_lancamento.configure(text="Insira valores válidos para as porcentagens.", text_color="red")
                     return
             else:
-                salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado)
+                salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado, " ", 0)
                 label_status_lancamento.configure(
                     text=f"Despesa de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!",
                     text_color="green"
@@ -956,6 +964,9 @@ def atualizar_lancamento(tipo):
 
 
     elif tipo == "lancar_receitas":
+        # Chama a função para carregar os inquilinos antes de renderizar o ComboBox
+        carregar_inquilinos()
+
         label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
         label_predio.pack(pady=10)
         label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
@@ -969,6 +980,11 @@ def atualizar_lancamento(tipo):
         ctk.CTkLabel(frame_conteudo, text="Categoria:").pack(pady=5)
         combo_categoria_receita = ctk.CTkComboBox(frame_conteudo, values=categorias_receitas)
         combo_categoria_receita.pack(pady=5)
+
+        # ComboBox para selecionar o inquilino
+        ctk.CTkLabel(frame_conteudo, text="Inquilino:").pack(pady=5)
+        combo_inquilino = ctk.CTkComboBox(frame_conteudo, values=[inquilino['nome'] for inquilino in inquilinos])
+        combo_inquilino.pack(pady=5)
         
         # Checkbox para dividir a receita
         dividir_receita_var = ctk.BooleanVar()
@@ -1001,8 +1017,9 @@ def atualizar_lancamento(tipo):
         def salvar_receita():
             valor = campo_valor_receita.get().strip()
             categoria = combo_categoria_receita.get()
+            inquilino_selecionado = combo_inquilino.get()  # Recupera o nome do inquilino
 
-            if not valor or not categoria:
+            if not valor or not categoria or not inquilino_selecionado:
                 label_status_lancamento.configure(text="Preencha todos os campos corretamente.", text_color="red")
                 return
             
@@ -1021,8 +1038,8 @@ def atualizar_lancamento(tipo):
                     valor_jlp = round(valor * (porcentagem_jlp / 100), 2)
 
                     # Salva nos dois prédios com os valores divididos
-                    salvar_lancamento_em_excel("Receita", valor_gv, categoria, "GV")
-                    salvar_lancamento_em_excel("Receita", valor_jlp, categoria, "JLP")
+                    salvar_lancamento_em_excel("Receita", valor_gv, categoria, "GV", inquilino_selecionado, 0)  # Passando inquilino e saldo inicial
+                    salvar_lancamento_em_excel("Receita", valor_jlp, categoria, "JLP", inquilino_selecionado, 0)  # Passando inquilino e saldo inicial
 
                     label_status_lancamento.configure(
                         text=f"Receita de R${valor} dividida entre os prédios: GV ({porcentagem_gv}%) e JLP ({porcentagem_jlp}%) registrada!",
@@ -1032,7 +1049,8 @@ def atualizar_lancamento(tipo):
                     label_status_lancamento.configure(text="Insira valores válidos para as porcentagens.", text_color="red")
                     return
             else:
-                salvar_lancamento_em_excel("Receita", valor, categoria, prédio_selecionado)
+                saldo_inicial = 0  # Ajuste o saldo inicial conforme necessário
+                salvar_lancamento_em_excel("Receita", valor, categoria, prédio_selecionado, inquilino_selecionado, saldo_inicial)
                 label_status_lancamento.configure(
                     text=f"Receita de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!",
                     text_color="green"
@@ -1042,6 +1060,8 @@ def atualizar_lancamento(tipo):
 
         label_status_lancamento = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
         label_status_lancamento.pack(pady=5)
+
+
 
 
 
@@ -1145,15 +1165,6 @@ def abrir_dashboard():
     label_status.pack(pady=5)
 
 
-import pandas as pd
-import customtkinter as ctk
-from tkinter import messagebox, simpledialog
-
-import pandas as pd
-import os
-import customtkinter as ctk
-from tkinter import messagebox
-
 def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arquivo_transferencias, arquivo_socios):
     """ Exibe o balancete com base nos arquivos Excel """
     for widget in frame_conteudo.winfo_children():
@@ -1182,7 +1193,8 @@ def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arqu
         despesa_total = df_predio[df_predio["Tipo"].str.upper() == "DESPESA"]["Valor"].sum()
         
         # Verificar se há um "Saldo Inicial" no mês anterior (coluna 5)
-        saldo_inicial = df_predio.iloc[0, 4] if df_predio.shape[1] > 4 else 0
+        # Verificar se há um "Saldo Inicial" no mês anterior (coluna 5)
+        saldo_inicial = df_predio.iloc[0, 4] if df_predio.shape[1] > 4 and pd.notna(df_predio.iloc[0, 4]) else 0
         saldo_final = receita_total - despesa_total + saldo_inicial
 
         # Inicializar saldo_restante com o saldo final
