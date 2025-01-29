@@ -1151,10 +1151,26 @@ def abrir_dashboard():
         arquivo_socios = f"socios.xlsx"  # Adicionando arquivo dos sócios
 
         # Verificar se os arquivos existem
-        arquivos_faltando = [arq for arq in [arquivo_predio, arquivo_outro_predio, arquivo_transferencias, arquivo_socios] if not os.path.exists(arq)]
+        arquivos_obrigatorios = [arquivo_predio, arquivo_outro_predio, arquivo_socios]
+        arquivos_faltando = [arq for arq in arquivos_obrigatorios if not os.path.exists(arq)]
+
         if arquivos_faltando:
             messagebox.showwarning("Erro", f"Os seguintes arquivos não foram encontrados:\n" + "\n".join(arquivos_faltando))
             return
+
+        if not os.path.exists(arquivo_transferencias):
+            # Cria um DataFrame vazio com as colunas desejadas
+            colunas = ["Valor", "Origem", "Destino", "Observações", "Data"]
+            df_transferencias = pd.DataFrame(columns=colunas)
+            
+            # Salva como Excel
+            df_transferencias.to_excel(arquivo_transferencias, index=False)
+            print(f"Arquivo '{arquivo_transferencias}' criado com sucesso!")
+
+        # Agora carrega o arquivo normalmente
+        df_transferencias = pd.read_excel(arquivo_transferencias)
+        print("Arquivo carregado com sucesso!")
+            
 
         # Se tudo estiver ok, exibir os dados no dashboard
         exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arquivo_transferencias, arquivo_socios)
@@ -1233,6 +1249,7 @@ def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arqu
                 # Atualizar saldo inicial no arquivo do próximo mês com saldo negativo
                 mes_ano_proximo = (pd.to_datetime(mes_ano, format="%Y-%m") + pd.DateOffset(months=1)).strftime("%Y-%m")
                 arquivo_proximo_mes = f"{predio}_{mes_ano_proximo}.xlsx"
+                colunas_esperadas = ["Tipo", "Categoria", "Valor", "Data", "Saldo Inicial"]
                 
                 if not os.path.exists(arquivo_proximo_mes):
                     novo_df = pd.DataFrame({
