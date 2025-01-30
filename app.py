@@ -420,9 +420,17 @@ prédio_selecionado = None
 
 # Função para selecionar o prédio
 def selecionar_predio(predio):
-    global prédio_selecionado
+    global prédio_selecionado, label_predio  # Garante que estamos acessando a variável global
     prédio_selecionado = predio
+
+    if not label_predio.winfo_exists():  # Se o label foi destruído
+        print("label_predio foi destruído. Criando novamente...")
+        label_predio = ctk.CTkLabel(frame_menu, text="")  # Recria o label no frame correto
+        label_predio.pack(pady=10)  # Adiciona o label à interface
+
     label_predio.configure(text=f"Prédio Selecionado: {prédio_selecionado}")
+
+
 
 
 # Configuração principal do CTk
