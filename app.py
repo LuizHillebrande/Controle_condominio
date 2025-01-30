@@ -38,7 +38,7 @@ def salvar_em_excel(tipo, categoria, valor, inquilino=None, observacoes=None, di
     
     # Adicionar as observações, inquilino e percentual de divisão, se houver
     novo_dado = pd.DataFrame([[tipo, categoria, float(valor), inquilino, observacoes, divida_porcentagem, datetime.now().strftime("%d/%m/%Y")]], 
-                             columns=["Tipo", "Categoria", "Valor", "Inquilino", "Observações", "Divida Percentual", "Data"])
+                             columns=["Tipo", "Categoria", "Valor", "Inquilino", "Observações", "Divida Percentual"])
 
     # Verificar se o arquivo já existe
     if os.path.exists(nome_arquivo):
@@ -698,6 +698,7 @@ def atualizar_menu_categorias(tipo):
 
 import customtkinter as ctk
 from tkinter import messagebox
+import tkinter as tk
 
 # Lista de inquilinos cadastrados (essa estrutura pode ser substituída por um banco de dados ou arquivo)
 inquilinos = []
@@ -844,17 +845,50 @@ def exibir_formulario_alteracao_aluguel():
     # Botão para alterar o valor do aluguel
     ctk.CTkButton(frame_conteudo, text="Alterar Aluguel", command=alterar_valor_aluguel).pack(pady=10)
 
+def validar_mes(mes):
+    try:
+        # Verifica se o mês tem o formato correto (YYYY-MM)
+        datetime.strptime(mes, "%Y-%m")
+        return True
+    except ValueError:
+        return False
+
+# Função para pedir o mês ao usuário
+def pedir_mes_usuario():
+    # Bloquear outras ações até o mês ser inserido
+    frame_menu.pack_forget()
+    label_instrucoes.pack(pady=10)
+    entry_mes.pack(pady=10)
+    botao_confirmar.pack(pady=10)
+    botao_lancar_despesas.configure(state="disabled")
+    botao_lancar_receitas.configure(state="disabled")
+    botao_transferir_receita.configure(state="disabled")
+
+# Função para confirmar a entrada do mês
+def confirmar_mes():
+    global mes_usuario
+    mes_usuario = entry_mes.get()
+    if validar_mes(mes_usuario):
+        print(f"Mês selecionado: {mes_usuario}")
+        frame_menu.pack(side="left", fill="y")  # Liberar o menu após inserir o mês
+        label_instrucoes.pack_forget()
+        entry_mes.pack_forget()
+        botao_confirmar.pack_forget()
+        botao_lancar_despesas.configure(state="normal")
+        botao_lancar_receitas.configure(state="normal")
+        botao_transferir_receita.configure(state="normal")
+    else:
+        # Caso o mês seja inválido
+        label_instrucoes.configure(text="Mês inválido! Tente novamente (Formato: YYYY-MM)")
+        entry_mes.delete(0, tk.END)
 
 
-    
-
-def salvar_lancamento_em_excel(tipo, valor, categoria, predio_destino, inquilino, saldo_inicial):
+def salvar_lancamento_em_excel(tipo, valor, categoria, predio_destino, inquilino, saldo_inicial, mes_usuario):
     if not predio_destino:
         return
     
-    # Criar nome do arquivo Excel para o prédio de destino
-    mes_atual = datetime.now().strftime("%Y-%m")
-    nome_arquivo = f"{predio_destino}_{mes_atual}.xlsx"
+    nome_arquivo = f"{predio_destino}_{mes_usuario}.xlsx"
+    print(nome_arquivo)
     
     # Adicionar as informações do lançamento (valor, categoria, data, inquilino e saldo inicial)
     novo_dado = pd.DataFrame([[tipo, categoria, float(valor), datetime.now().strftime("%d/%m/%Y"), saldo_inicial, inquilino]], 
@@ -875,6 +909,7 @@ def salvar_lancamento_em_excel(tipo, valor, categoria, predio_destino, inquilino
 import customtkinter as ctk
 
 def atualizar_lancamento(tipo):
+    global mes_usuario
     """ Atualiza o conteúdo da área principal com os campos para lançar despesas, receitas ou transferir receita """
     # Limpa o conteúdo atual da área de conteúdo
     for widget in frame_conteudo.winfo_children():
@@ -947,8 +982,8 @@ def atualizar_lancamento(tipo):
 
                     # Salva nos dois prédios com os valores divididos
                     # Modificando a chamada para incluir "Não existe" no lugar do inquilino
-                    salvar_lancamento_em_excel("Despesa", valor_gv, categoria, "GV", " ", 0)
-                    salvar_lancamento_em_excel("Despesa", valor_jlp, categoria, "JLP", " ", 0)
+                    salvar_lancamento_em_excel("Despesa", valor_gv, categoria, "GV", " ", 0, mes_usuario)
+                    salvar_lancamento_em_excel("Despesa", valor_jlp, categoria, "JLP", " ", 0, mes_usuario)
 
 
                     label_status_lancamento.configure(
@@ -959,7 +994,7 @@ def atualizar_lancamento(tipo):
                     label_status_lancamento.configure(text="Insira valores válidos para as porcentagens.", text_color="red")
                     return
             else:
-                salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado, " ", 0)
+                salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado, " ", 0, mes_usuario)
                 label_status_lancamento.configure(
                     text=f"Despesa de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!",
                     text_color="green"
@@ -1046,8 +1081,8 @@ def atualizar_lancamento(tipo):
                     valor_jlp = round(valor * (porcentagem_jlp / 100), 2)
 
                     # Salva nos dois prédios com os valores divididos
-                    salvar_lancamento_em_excel("Receita", valor_gv, categoria, "GV", inquilino_selecionado, 0)  # Passando inquilino e saldo inicial
-                    salvar_lancamento_em_excel("Receita", valor_jlp, categoria, "JLP", inquilino_selecionado, 0)  # Passando inquilino e saldo inicial
+                    salvar_lancamento_em_excel("Receita", valor_gv, categoria, "GV", inquilino_selecionado, 0, mes_usuario)  # Passando inquilino e saldo inicial
+                    salvar_lancamento_em_excel("Receita", valor_jlp, categoria, "JLP", inquilino_selecionado, 0, mes_usuario)  # Passando inquilino e saldo inicial
 
                     label_status_lancamento.configure(
                         text=f"Receita de R${valor} dividida entre os prédios: GV ({porcentagem_gv}%) e JLP ({porcentagem_jlp}%) registrada!",
@@ -1058,7 +1093,7 @@ def atualizar_lancamento(tipo):
                     return
             else:
                 saldo_inicial = 0  # Ajuste o saldo inicial conforme necessário
-                salvar_lancamento_em_excel("Receita", valor, categoria, prédio_selecionado, inquilino_selecionado, saldo_inicial)
+                salvar_lancamento_em_excel("Receita", valor, categoria, prédio_selecionado, inquilino_selecionado, saldo_inicial, mes_usuario)
                 label_status_lancamento.configure(
                     text=f"Receita de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!",
                     text_color="green"
@@ -1362,14 +1397,24 @@ ctk.CTkButton(frame_menu, text="Adicionar Categoria (Despesa)", command=lambda: 
 ctk.CTkButton(frame_menu, text="Excluir Categoria (Despesa)", command=lambda: atualizar_menu_categorias("excluir_despesa"), width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Adicionar Categoria (Receita)", command=lambda: atualizar_menu_categorias("adicionar_receita"), width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Excluir Categoria (Receita)", command=lambda: atualizar_menu_categorias("excluir_receita"), width=180).pack(pady=10)
-ctk.CTkButton(frame_menu, text="Lançar Despesas", command=lambda: atualizar_lancamento("lancar_despesas"), width=180).pack(pady=10)
-ctk.CTkButton(frame_menu, text="Lançar Receitas", command=lambda: atualizar_lancamento("lancar_receitas"), width=180).pack(pady=10)
-ctk.CTkButton(frame_menu, text="Transferir Receita", command=lambda: atualizar_lancamento("transferir_receita"), width=180).pack(pady=10)
+botao_lancar_despesas = ctk.CTkButton(frame_menu, text="Lançar Despesas", command=lambda: atualizar_lancamento("lancar_despesas"), state="disabled", width=180)
+botao_lancar_despesas.pack(pady=10)
+
+botao_lancar_receitas = ctk.CTkButton(frame_menu, text="Lançar Receitas", command=lambda: atualizar_lancamento("lancar_receitas"), state="disabled", width=180)
+botao_lancar_receitas.pack(pady=10)
+
+botao_transferir_receita = ctk.CTkButton(frame_menu, text="Transferir Receita", command=lambda: atualizar_lancamento("transferir_receita"), state="disabled", width=180)
 ctk.CTkButton(frame_menu, text="Carregar Sócios", command=carregar_socios, width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Atualizar Rateio", command=atualizar_menu_rateio, width=180).pack(pady=10)
 btn_dashboard = ctk.CTkButton(frame_menu, text="Visualizar Dashboard", command=abrir_dashboard, width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Cadastrar Novo Inquilino", command=exibir_formulario_cadastro_inquilino, width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Alterar Aluguel", command=exibir_formulario_alteracao_aluguel, width=180).pack(pady=10)
+label_instrucoes = ctk.CTkLabel(frame_menu, text="Por favor, insira o mês de lançamento (Formato: YYYY-MM):")
+label_instrucoes.pack(pady=10)
+entry_mes = ctk.CTkEntry(frame_menu)
+entry_mes.pack(pady=10)
+botao_confirmar = ctk.CTkButton(frame_menu, text="Confirmar Mês", command=confirmar_mes)
+botao_confirmar.pack(pady=10)
 
 
 
