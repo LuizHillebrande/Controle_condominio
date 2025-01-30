@@ -722,7 +722,12 @@ def carregar_inquilinos():
         
         # Preencher a lista com os dados do Excel
         for _, row in df_inquilinos.iterrows():
-            inquilinos.append({"nome": row["nome"], "valor_aluguel": row["valor_aluguel"]})
+            inquilinos.append({
+                "nome": row["nome"],
+                "valor_aluguel": row["valor_aluguel"],
+                "valor_iptu": row.get("valor_iptu", 0),  # Se não houver valor_iptu, atribui 0
+                "valor_condominio": row.get("valor_condominio", 0)  # Se não houver valor_condominio, atribui 0
+            })
 
         # Verificar se a lista foi carregada corretamente
         print("Inquilinos carregados:", inquilinos)
@@ -730,23 +735,31 @@ def carregar_inquilinos():
     except Exception as e:
         print(f"Erro ao carregar inquilinos: {e}")
 
-
 # Função para adicionar ou editar inquilino
 def salvar_inquilino():
     nome_inquilino = campo_nome_inquilino.get().strip()
     valor_aluguel = campo_valor_aluguel.get().strip()
+    valor_iptu = campo_iptu.get().strip()
+    valor_condominio = campo_condominio.get().strip()
 
-    if not nome_inquilino or not valor_aluguel:
+    if not nome_inquilino or not valor_aluguel or not valor_iptu or not valor_condominio:
         messagebox.showerror("Erro", "Preencha todos os campos.")
         return
 
     try:
         valor_aluguel = float(valor_aluguel.replace(",", "."))
+        valor_iptu = float(valor_iptu.replace(",", "."))
+        valor_condominio = float(valor_condominio.replace(",", "."))
     except ValueError:
-        messagebox.showerror("Erro", "Valor do aluguel inválido.")
+        messagebox.showerror("Erro", "Valores inválidos.")
         return
 
-    inquilinos.append({"nome": nome_inquilino, "valor_aluguel": valor_aluguel})
+    inquilinos.append({
+        "nome": nome_inquilino,
+        "valor_aluguel": valor_aluguel,
+        "valor_iptu": valor_iptu,
+        "valor_condominio": valor_condominio
+    })
 
     # Salvar o novo inquilino no arquivo Excel
     df_inquilinos = pd.DataFrame(inquilinos)  # Convertendo a lista de inquilinos para DataFrame
@@ -757,6 +770,9 @@ def salvar_inquilino():
     # Limpar os campos após salvar
     campo_nome_inquilino.delete(0, 'end')
     campo_valor_aluguel.delete(0, 'end')
+    campo_iptu.delete(0, 'end')
+    campo_condominio.delete(0, 'end')
+
     
 # Função para exibir o formulário de cadastro de inquilino
 def exibir_formulario_cadastro_inquilino():
@@ -779,53 +795,101 @@ def exibir_formulario_cadastro_inquilino():
     campo_valor_aluguel = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 1500,00", width=250)
     campo_valor_aluguel.pack(pady=5)
 
+    # Campo para valor do IPTU
+    ctk.CTkLabel(frame_conteudo, text="Valor do IPTU:").pack(pady=5)
+    global campo_iptu
+    campo_iptu = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 200,00", width=250)
+    campo_iptu.pack(pady=5)
+
+    # Campo para valor do condomínio
+    ctk.CTkLabel(frame_conteudo, text="Valor do Condomínio:").pack(pady=5)
+    global campo_condominio
+    campo_condominio = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 300,00", width=250)
+    campo_condominio.pack(pady=5)
+
     # Botão para salvar o cadastro do inquilino
     ctk.CTkButton(frame_conteudo, text="Salvar Inquilino", command=salvar_inquilino).pack(pady=10)
 
 # Função para selecionar um inquilino do combo
+# Função para selecionar o inquilino e carregar os valores de aluguel, IPTU e condomínio
+
+def carregar_inquilinos():
+    try:
+        # Carregar os dados de inquilinos do Excel
+        df_inquilinos = pd.read_excel("inquilinos.xlsx")
+        # Converter os dados para uma lista de dicionários
+        inquilinos = df_inquilinos.to_dict(orient="records")
+        return inquilinos
+    except FileNotFoundError:
+        return []  # Caso o arquivo não exista, retorna uma lista vazia
+
+# Carregar os inquilinos ao iniciar
+inquilinos = carregar_inquilinos()
+
 def selecionar_inquilino():
     inquilino_selecionado = combo_inquilinos.get()
+    
+    # Buscar o inquilino no banco de dados de inquilinos
     for inquilino in inquilinos:
         if inquilino["nome"] == inquilino_selecionado:
-            campo_valor_atual_aluguel.delete(0, 'end')
-            campo_valor_atual_aluguel.insert(0, f"R${inquilino['valor_aluguel']:.2f}")
+            campo_valor_atual_aluguel.delete(0, "end")
+            campo_valor_atual_aluguel.insert(0, f"{inquilino['valor_aluguel']:.2f}")
+            
+            campo_valor_iptu.delete(0, "end")
+            campo_valor_iptu.insert(0, f"{inquilino['valor_iptu']:.2f}")
+            
+            campo_valor_condominio.delete(0, "end")
+            campo_valor_condominio.insert(0, f"{inquilino['valor_condominio']:.2f}")
             break
 
 # Função para alterar o valor do aluguel
 
 def alterar_valor_aluguel():
     inquilino_selecionado = combo_inquilinos.get()
-    novo_valor = campo_valor_atual_aluguel.get().strip()
+    novo_valor_aluguel = campo_valor_atual_aluguel.get().strip()
+    novo_valor_iptu = campo_valor_iptu.get().strip()  # Adicionando IPTU
+    novo_valor_condominio = campo_valor_condominio.get().strip()  # Adicionando Condomínio
 
-    if not novo_valor:
-        messagebox.showerror("Erro", "Informe o novo valor do aluguel.")
+    if not novo_valor_aluguel or not novo_valor_iptu or not novo_valor_condominio:
+        messagebox.showerror("Erro", "Informe todos os valores (aluguel, IPTU e condomínio).")
         return
 
     try:
-        novo_valor = float(novo_valor.replace(",", "."))
+        # Limpar espaços e substituir a vírgula por ponto para valores decimais
+        novo_valor_aluguel = campo_valor_atual_aluguel.get().strip().replace(",", ".")
+        novo_valor_iptu = campo_valor_iptu.get().strip().replace(",", ".")
+        novo_valor_condominio = campo_valor_condominio.get().strip().replace(",", ".")
+
+        # Tentar converter os valores para float
+        novo_valor_aluguel = float(novo_valor_aluguel)
+        novo_valor_iptu = float(novo_valor_iptu)
+        novo_valor_condominio = float(novo_valor_condominio)
     except ValueError:
-        messagebox.showerror("Erro", "Valor inválido.")
+        messagebox.showerror("Erro", "Um dos valores é inválido. Certifique-se de inserir números válidos.")
         return
 
-    # Atualizar o valor do aluguel do inquilino selecionado
+
+    # Atualizar o valor do aluguel, IPTU e condomínio do inquilino selecionado
     for inquilino in inquilinos:
-        if inquilino["nome"] == inquilino_selecionado:  # Usar 'nome' (minúsculo)
-            inquilino["valor_aluguel"] = novo_valor
-            messagebox.showinfo("Sucesso", f"Valor do aluguel de {inquilino_selecionado} alterado com sucesso!")
+        if inquilino["nome"] == inquilino_selecionado:
+            inquilino["valor_aluguel"] = novo_valor_aluguel
+            inquilino["valor_iptu"] = novo_valor_iptu  # Atualizando IPTU
+            inquilino["valor_condominio"] = novo_valor_condominio  # Atualizando Condomínio
+            messagebox.showinfo("Sucesso", f"Valores de {inquilino_selecionado} atualizados com sucesso!")
             break
 
     # Salvar os inquilinos atualizados no arquivo Excel
     df_inquilinos = pd.DataFrame(inquilinos)  # Convertendo a lista de inquilinos para DataFrame
     df_inquilinos.to_excel("inquilinos.xlsx", index=False)
 
-# Função para exibir o formulário de alteração do aluguel
+# Função para exibir o formulário de alteração do valor do aluguel, IPTU e condomínio
 def exibir_formulario_alteracao_aluguel():
     # Limpar o conteúdo anterior do frame
     for widget in frame_conteudo.winfo_children():
         widget.destroy()
 
     # Título do formulário
-    ctk.CTkLabel(frame_conteudo, text="Alterar Aluguel do Inquilino", font=("Arial", 18, "bold")).pack(pady=10)
+    ctk.CTkLabel(frame_conteudo, text="Alterar Valores do Inquilino", font=("Arial", 18, "bold")).pack(pady=10)
 
     # ComboBox para selecionar o inquilino
     ctk.CTkLabel(frame_conteudo, text="Selecionar Inquilino:").pack(pady=5)
@@ -833,8 +897,8 @@ def exibir_formulario_alteracao_aluguel():
     combo_inquilinos = ctk.CTkComboBox(frame_conteudo, values=[inquilino["nome"] for inquilino in inquilinos])
     combo_inquilinos.pack(pady=5)
 
-    # Botão para carregar o valor atual do aluguel
-    ctk.CTkButton(frame_conteudo, text="Carregar Valor Atual", command=selecionar_inquilino).pack(pady=5)
+    # Botão para carregar os valores atuais do inquilino
+    ctk.CTkButton(frame_conteudo, text="Carregar Valores Atuais", command=selecionar_inquilino).pack(pady=5)
 
     # Campo para alterar o valor do aluguel
     ctk.CTkLabel(frame_conteudo, text="Novo Valor do Aluguel:").pack(pady=5)
@@ -842,8 +906,21 @@ def exibir_formulario_alteracao_aluguel():
     campo_valor_atual_aluguel = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 1600,00", width=250)
     campo_valor_atual_aluguel.pack(pady=5)
 
-    # Botão para alterar o valor do aluguel
-    ctk.CTkButton(frame_conteudo, text="Alterar Aluguel", command=alterar_valor_aluguel).pack(pady=10)
+    # Campo para o novo valor do IPTU
+    ctk.CTkLabel(frame_conteudo, text="Novo Valor do IPTU:").pack(pady=5)
+    global campo_valor_iptu
+    campo_valor_iptu = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 200,00", width=250)
+    campo_valor_iptu.pack(pady=5)
+
+    # Campo para o novo valor do condomínio
+    ctk.CTkLabel(frame_conteudo, text="Novo Valor do Condomínio:").pack(pady=5)
+    global campo_valor_condominio
+    campo_valor_condominio = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 300,00", width=250)
+    campo_valor_condominio.pack(pady=5)
+
+    # Botão para alterar os valores (aluguel, IPTU, condomínio)
+    ctk.CTkButton(frame_conteudo, text="Alterar Valores", command=alterar_valor_aluguel).pack(pady=10)
+
 
 def validar_mes(mes):
     try:
