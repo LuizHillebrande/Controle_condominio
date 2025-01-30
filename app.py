@@ -1183,8 +1183,6 @@ def atualizar_lancamento(tipo):
 
 
 
-
-
     elif tipo == "transferir_receita":
         label_predio = ctk.CTkLabel(frame_conteudo, text="Prédio Selecionado: Nenhum", font=("Arial", 14, "bold"))
         label_predio.pack(pady=10)
