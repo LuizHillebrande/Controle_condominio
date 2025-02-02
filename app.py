@@ -1269,7 +1269,7 @@ def abrir_dashboard():
         arquivo_socios = f"socios.xlsx"  # Adicionando arquivo dos sócios
 
         # Verificar se os arquivos existem
-        arquivos_obrigatorios = [arquivo_predio, arquivo_outro_predio, arquivo_socios]
+        arquivos_obrigatorios = [arquivo_predio, arquivo_socios]
         arquivos_faltando = [arq for arq in arquivos_obrigatorios if not os.path.exists(arq)]
 
         if arquivos_faltando:
