@@ -1654,13 +1654,14 @@ ctk.CTkButton(frame_menu, text="Atualizar Rateio", command=atualizar_menu_rateio
 btn_dashboard = ctk.CTkButton(frame_menu, text="Visualizar Dashboard", command=abrir_dashboard, width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Cadastrar Novo Inquilino", command=exibir_formulario_cadastro_inquilino, width=180).pack(pady=10)
 ctk.CTkButton(frame_menu, text="Alterar Aluguel", command=exibir_formulario_alteracao_aluguel, width=180).pack(pady=10)
+ctk.CTkButton(frame_menu, text="Lançar Aluguel", command=atualizar_lancamento_receitas_aluguel, width=180).pack(pady=10)
 label_instrucoes = ctk.CTkLabel(frame_menu, text="Por favor, insira o mês de lançamento (Formato: YYYY-MM):")
 label_instrucoes.pack(pady=10)
 entry_mes = ctk.CTkEntry(frame_menu)
 entry_mes.pack(pady=10)
 botao_confirmar = ctk.CTkButton(frame_menu, text="Confirmar Mês", command=confirmar_mes)
 botao_confirmar.pack(pady=10)
-ctk.CTkButton(frame_menu, text="Lançar Aluguel", command=atualizar_lancamento_receitas_aluguel, width=180).pack(pady=10)
+
 
 
 
