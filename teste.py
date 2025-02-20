@@ -1115,17 +1115,6 @@ def atualizar_lancamento(tipo):
 
         check_dividir_despesa.configure(command=toggle_campos_porcentagem)
 
-        # Carregar dados dos sócios do arquivo socios.xlsx
-        import pandas as pd
-        socios_df = pd.read_excel("socios.xlsx")
-        
-        socios_lista = list(socios_df['nome'])  # Lista com os nomes dos sócios
-
-        # ComboBox para seleção do sócio para retirada de capital
-        ctk.CTkLabel(frame_conteudo, text="Selecionar Sócio para Retirar Capital:").pack(pady=5)
-        combo_socio_retirada = ctk.CTkComboBox(frame_conteudo, values=socios_lista)
-        combo_socio_retirada.pack(pady=5)
-
         def salvar_despesa():
             valor = campo_valor_despesa.get().strip()
             categoria = combo_categoria_despesa.get()
@@ -1136,60 +1125,42 @@ def atualizar_lancamento(tipo):
             
             valor = float(valor.replace(",", "."))  # Converte para número
 
-            if categoria == "Retirada de Capital" and combo_socio_retirada.get() != "":
-                # Sócio que fará a retirada de capital
-                socio_retirada = combo_socio_retirada.get()
-                porcentagem_socio = socios_df.loc[socios_df['nome'] == socio_retirada, 'porcentagem'].values[0]
-                
-                # Atualiza o saldo do sócio que está retirando
-                total_capital = 100  # Total de capital, aqui é um valor fixo, você pode modificar conforme seu sistema
-                saldo_socio_atualizado = (porcentagem_socio / 100) * total_capital - valor
-                socios_df.loc[socios_df['nome'] == socio_retirada, 'porcentagem'] = saldo_socio_atualizado
+            if dividir_despesa_var.get():
+                try:
+                    porcentagem_gv = float(campo_porcentagem_gv.get().strip())
+                    porcentagem_jlp = float(campo_porcentagem_jlp.get().strip())
 
-                # Salva os dados atualizados no arquivo
-                socios_df.to_excel("socios_atualizado.xlsx", index=False)
-                
-                label_status_lancamento.configure(
-                    text=f"Retirada de R${valor} do sócio {socio_retirada} registrada!",
-                    text_color="green"
-                )
-            else:
-                if dividir_despesa_var.get():
-                    try:
-                        porcentagem_gv = float(campo_porcentagem_gv.get().strip())
-                        porcentagem_jlp = float(campo_porcentagem_jlp.get().strip())
-
-                        if porcentagem_gv + porcentagem_jlp != 100:
-                            label_status_lancamento.configure(text="As porcentagens devem somar 100%.", text_color="red")
-                            return
-
-                        valor_gv = round(valor * (porcentagem_gv / 100), 2)
-                        valor_jlp = round(valor * (porcentagem_jlp / 100), 2)
-
-                        # Salva nos dois prédios com os valores divididos
-                        salvar_lancamento_em_excel("Despesa", valor_gv, categoria, "GV", " ", 0, mes_usuario)
-                        salvar_lancamento_em_excel("Despesa", valor_jlp, categoria, "JLP", " ", 0, mes_usuario)
-
-                        label_status_lancamento.configure(
-                            text=f"Despesa de R${valor} dividida entre os prédios: GV ({porcentagem_gv}%) e JLP ({porcentagem_jlp}%) registrada!",
-                            text_color="green"
-                        )
-                    except ValueError:
-                        label_status_lancamento.configure(text="Insira valores válidos para as porcentagens.", text_color="red")
+                    if porcentagem_gv + porcentagem_jlp != 100:
+                        label_status_lancamento.configure(text="As porcentagens devem somar 100%.", text_color="red")
                         return
-                else:
-                    salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado, " ", 0, mes_usuario)
+
+                    valor_gv = round(valor * (porcentagem_gv / 100), 2)
+                    valor_jlp = round(valor * (porcentagem_jlp / 100), 2)
+
+                    # Salva nos dois prédios com os valores divididos
+                    # Modificando a chamada para incluir "Não existe" no lugar do inquilino
+                    salvar_lancamento_em_excel("Despesa", valor_gv, categoria, "GV", " ", 0, mes_usuario)
+                    salvar_lancamento_em_excel("Despesa", valor_jlp, categoria, "JLP", " ", 0, mes_usuario)
+
+
                     label_status_lancamento.configure(
-                        text=f"Despesa de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!",
+                        text=f"Despesa de R${valor} dividida entre os prédios: GV ({porcentagem_gv}%) e JLP ({porcentagem_jlp}%) registrada!",
                         text_color="green"
                     )
+                except ValueError:
+                    label_status_lancamento.configure(text="Insira valores válidos para as porcentagens.", text_color="red")
+                    return
+            else:
+                salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado, " ", 0, mes_usuario)
+                label_status_lancamento.configure(
+                    text=f"Despesa de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!",
+                    text_color="green"
+                )
 
         ctk.CTkButton(frame_conteudo, text="Registrar Despesa", command=salvar_despesa).pack(pady=10)
 
         label_status_lancamento = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
         label_status_lancamento.pack(pady=5)
-
-
 
     elif tipo == "lancar_receitas":
         # Exibe o prédio selecionado
@@ -1566,7 +1537,105 @@ def exibir_dashboard(mes_ano, predio, arquivo_predio, arquivo_outro_predio, arqu
         messagebox.showerror("Erro", f"Ocorreu um erro ao carregar os arquivos: {e}")
 
 
+def atualizar_retirada_capital():
+    # Limpa o conteúdo do frame de conteúdo
+    for widget in frame_conteudo.winfo_children():
+        widget.destroy()
 
+    ctk.CTkLabel(frame_conteudo, text="Retirada de Capital", font=("Arial", 18, "bold")).pack(pady=10)
+
+    import pandas as pd
+    import os
+
+    # Carregar os dados dos sócios do arquivo socios.xlsx (para listar os nomes)
+    try:
+        socios_df = pd.read_excel("socios.xlsx")
+    except FileNotFoundError:
+        messagebox.showerror("Erro", "Arquivo socios.xlsx não encontrado.")
+        return
+
+    # Tenta carregar o arquivo de saldos dos sócios; se não existir, cria com saldo 0 para cada sócio
+    if os.path.exists("saldo_socios.xlsx"):
+        saldo_df = pd.read_excel("saldo_socios.xlsx")
+    else:
+        saldo_df = socios_df[['nome']].copy()
+        saldo_df['saldo'] = 0.0
+        saldo_df.to_excel("saldo_socios.xlsx", index=False)
+
+    # Exibir os saldos atuais dos sócios
+    frame_saldos = ctk.CTkFrame(frame_conteudo)
+    frame_saldos.pack(pady=5)
+    ctk.CTkLabel(frame_saldos, text="Saldos Atuais:", font=("Arial", 14, "bold")).pack(pady=5)
+    saldo_labels = {}
+    for index, row in saldo_df.iterrows():
+        nome = row['nome']
+        saldo_atual = row['saldo']
+        lbl = ctk.CTkLabel(frame_saldos, text=f"{nome}: R${saldo_atual:.2f}", font=("Arial", 12))
+        lbl.pack(pady=2)
+        saldo_labels[nome] = lbl
+
+    # Interface para selecionar o sócio que fará a retirada
+    ctk.CTkLabel(frame_conteudo, text="Selecione o Sócio para Retirada:").pack(pady=5)
+    socios_lista = list(socios_df['nome'])
+    combo_socio = ctk.CTkComboBox(frame_conteudo, values=socios_lista, width=200)
+    combo_socio.pack(pady=5)
+
+    # Campo para inserir o valor da retirada
+    ctk.CTkLabel(frame_conteudo, text="Valor da Retirada:").pack(pady=5)
+    campo_valor_retirada = ctk.CTkEntry(frame_conteudo, placeholder_text="Ex: 500,00", width=200)
+    campo_valor_retirada.pack(pady=5)
+
+    def confirmar_retirada():
+        socio_selecionado = combo_socio.get()
+        if not socio_selecionado:
+            messagebox.showwarning("Atenção", "Selecione um sócio para retirada.")
+            return
+
+        valor_str = campo_valor_retirada.get().strip()
+        if not valor_str:
+            messagebox.showwarning("Atenção", "Insira o valor da retirada.")
+            return
+
+        try:
+            valor_retirada = float(valor_str.replace(",", "."))
+        except ValueError:
+            messagebox.showwarning("Atenção", "Valor inválido para retirada.")
+            return
+
+        # Atualiza o saldo do sócio selecionado (subtrai o valor da retirada)
+        idx_sel = saldo_df[saldo_df['nome'] == socio_selecionado].index
+        if idx_sel.empty:
+            messagebox.showerror("Erro", "Sócio não encontrado no arquivo de saldos.")
+            return
+
+        saldo_atual_sel = saldo_df.loc[idx_sel, 'saldo'].values[0]
+        saldo_df.loc[idx_sel, 'saldo'] = saldo_atual_sel - valor_retirada
+
+        # Para cada outro sócio, adiciona o valor da retirada ao saldo atual
+        for nome in saldo_df['nome']:
+            if nome != socio_selecionado:
+                idx = saldo_df[saldo_df['nome'] == nome].index
+                saldo_atual = saldo_df.loc[idx, 'saldo'].values[0]
+                saldo_df.loc[idx, 'saldo'] = saldo_atual + valor_retirada
+
+        # Salvar o novo saldo no arquivo de saldos
+        saldo_df.to_excel("saldo_socios.xlsx", index=False)
+
+        # Atualiza os labels na interface
+        for nome, lbl in saldo_labels.items():
+            novo_saldo = saldo_df.loc[saldo_df['nome'] == nome, 'saldo'].values[0]
+            lbl.configure(text=f"{nome}: R${novo_saldo:.2f}")
+
+        messagebox.showinfo("Sucesso", f"Retirada de R${valor_retirada:.2f} do sócio {socio_selecionado} registrada.\n"
+                                        f"Os demais sócios ganharam direito de retirar R${valor_retirada:.2f} cada.")
+        
+        salvar_lancamento_em_excel("Despesa", valor_retirada, "Retirada de Capital", prédio_selecionado, socio_selecionado, 0, mes_usuario)
+
+    ctk.CTkButton(frame_conteudo, text="Confirmar Retirada de Capital", command=confirmar_retirada, width=200).pack(pady=10)
+    
+
+
+ctk.CTkButton(frame_menu, text="Retirada de Capital", command=atualizar_retirada_capital, width=180).pack(pady=10)
 
 # Agora, nos botões, você chama a função de atualização de acordo com o tipo:
 ctk.CTkButton(frame_menu, text="Adicionar Categoria (Despesa)", command=lambda: atualizar_menu_categorias("adicionar_despesa"), width=180).pack(pady=10)
