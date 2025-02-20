@@ -858,34 +858,38 @@ def atualizar_lancamento_receitas_aluguel():
     label_status_lancamento.pack(pady=5)
     
     # Função para salvar a receita de aluguel
+    
     def salvar_receita_aluguel():
         inquilino_nome = combo_inquilino.get()
         if not inquilino_nome:
             label_status_lancamento.configure(text="Selecione um inquilino.", text_color="red")
             return
+
         inq = next((i for i in inquilinos if i['nome'] == inquilino_nome), None)
         if not inq: 
             label_status_lancamento.configure(text="Inquilino não encontrado.", text_color="red")
             return
-        total = inq['valor_aluguel'] + inq['valor_iptu'] + inq['valor_condominio']
-        # Aqui, a ordem dos parâmetros deve ser:
-        # tipo, valor, categoria, prédio_destino, inquilino, saldo_inicial, mes_usuario
-        salvar_lancamento_em_excel("Receita", total, "Aluguel", prédio_selecionado, inquilino_nome, 0, mes_usuario)
+
+        # Valores individuais
+        valor_aluguel = inq['valor_aluguel']
+        valor_iptu = inq['valor_iptu']
+        valor_condominio = inq['valor_condominio']
+
+        # Salvar aluguel como receita
+        salvar_lancamento_em_excel("Receita", valor_aluguel, "Aluguel", prédio_selecionado, inquilino_nome, 0, mes_usuario)
+
+        # Salvar IPTU como despesa
+        salvar_lancamento_em_excel("Despesa", valor_iptu, "IPTU", prédio_selecionado, inquilino_nome, 0, mes_usuario)
+
+        # Salvar condomínio como despesa
+        salvar_lancamento_em_excel("Despesa", valor_condominio, "Condomínio", prédio_selecionado, inquilino_nome, 0, mes_usuario)
+
         label_status_lancamento.configure(
-            text=f"Receita de R${total:.2f} para {inquilino_nome} registrada!",
+            text=f"Aluguel de R${valor_aluguel:.2f} registrado como receita.\n"
+                f"IPTU de R${valor_iptu:.2f} e Condomínio de R${valor_condominio:.2f} registrados como despesas.",
             text_color="green"
         )
 
-        
-        # Aqui, "Receita" é o tipo, "Aluguel" pode ser a categoria fixa, seguido do total, data, saldo inicial e nome do inquilino.
-        
-        salvar_lancamento_em_excel("Receita", total, "Aluguel", prédio_selecionado, inquilino_nome, 0, mes_usuario)
-
-        
-        label_status_lancamento.configure(
-            text=f"Receita de R${total:.2f} para {inquilino_nome} registrada!",
-            text_color="green"
-        )
     
     ctk.CTkButton(frame_conteudo, text="Registrar Receita de Aluguel", command=salvar_receita_aluguel).pack(pady=10)
 
@@ -1111,6 +1115,17 @@ def atualizar_lancamento(tipo):
 
         check_dividir_despesa.configure(command=toggle_campos_porcentagem)
 
+        # Carregar dados dos sócios do arquivo socios.xlsx
+        import pandas as pd
+        socios_df = pd.read_excel("socios.xlsx")
+        
+        socios_lista = list(socios_df['nome'])  # Lista com os nomes dos sócios
+
+        # ComboBox para seleção do sócio para retirada de capital
+        ctk.CTkLabel(frame_conteudo, text="Selecionar Sócio para Retirar Capital:").pack(pady=5)
+        combo_socio_retirada = ctk.CTkComboBox(frame_conteudo, values=socios_lista)
+        combo_socio_retirada.pack(pady=5)
+
         def salvar_despesa():
             valor = campo_valor_despesa.get().strip()
             categoria = combo_categoria_despesa.get()
@@ -1121,42 +1136,59 @@ def atualizar_lancamento(tipo):
             
             valor = float(valor.replace(",", "."))  # Converte para número
 
-            if dividir_despesa_var.get():
-                try:
-                    porcentagem_gv = float(campo_porcentagem_gv.get().strip())
-                    porcentagem_jlp = float(campo_porcentagem_jlp.get().strip())
+            if categoria == "Retirada de Capital" and combo_socio_retirada.get() != "":
+                # Sócio que fará a retirada de capital
+                socio_retirada = combo_socio_retirada.get()
+                porcentagem_socio = socios_df.loc[socios_df['nome'] == socio_retirada, 'porcentagem'].values[0]
+                
+                # Atualiza o saldo do sócio que está retirando
+                total_capital = 100  # Total de capital, aqui é um valor fixo, você pode modificar conforme seu sistema
+                saldo_socio_atualizado = (porcentagem_socio / 100) * total_capital - valor
+                socios_df.loc[socios_df['nome'] == socio_retirada, 'porcentagem'] = saldo_socio_atualizado
 
-                    if porcentagem_gv + porcentagem_jlp != 100:
-                        label_status_lancamento.configure(text="As porcentagens devem somar 100%.", text_color="red")
-                        return
-
-                    valor_gv = round(valor * (porcentagem_gv / 100), 2)
-                    valor_jlp = round(valor * (porcentagem_jlp / 100), 2)
-
-                    # Salva nos dois prédios com os valores divididos
-                    # Modificando a chamada para incluir "Não existe" no lugar do inquilino
-                    salvar_lancamento_em_excel("Despesa", valor_gv, categoria, "GV", " ", 0, mes_usuario)
-                    salvar_lancamento_em_excel("Despesa", valor_jlp, categoria, "JLP", " ", 0, mes_usuario)
-
-
-                    label_status_lancamento.configure(
-                        text=f"Despesa de R${valor} dividida entre os prédios: GV ({porcentagem_gv}%) e JLP ({porcentagem_jlp}%) registrada!",
-                        text_color="green"
-                    )
-                except ValueError:
-                    label_status_lancamento.configure(text="Insira valores válidos para as porcentagens.", text_color="red")
-                    return
-            else:
-                salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado, " ", 0, mes_usuario)
+                # Salva os dados atualizados no arquivo
+                socios_df.to_excel("socios_atualizado.xlsx", index=False)
+                
                 label_status_lancamento.configure(
-                    text=f"Despesa de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!",
+                    text=f"Retirada de R${valor} do sócio {socio_retirada} registrada!",
                     text_color="green"
                 )
+            else:
+                if dividir_despesa_var.get():
+                    try:
+                        porcentagem_gv = float(campo_porcentagem_gv.get().strip())
+                        porcentagem_jlp = float(campo_porcentagem_jlp.get().strip())
+
+                        if porcentagem_gv + porcentagem_jlp != 100:
+                            label_status_lancamento.configure(text="As porcentagens devem somar 100%.", text_color="red")
+                            return
+
+                        valor_gv = round(valor * (porcentagem_gv / 100), 2)
+                        valor_jlp = round(valor * (porcentagem_jlp / 100), 2)
+
+                        # Salva nos dois prédios com os valores divididos
+                        salvar_lancamento_em_excel("Despesa", valor_gv, categoria, "GV", " ", 0, mes_usuario)
+                        salvar_lancamento_em_excel("Despesa", valor_jlp, categoria, "JLP", " ", 0, mes_usuario)
+
+                        label_status_lancamento.configure(
+                            text=f"Despesa de R${valor} dividida entre os prédios: GV ({porcentagem_gv}%) e JLP ({porcentagem_jlp}%) registrada!",
+                            text_color="green"
+                        )
+                    except ValueError:
+                        label_status_lancamento.configure(text="Insira valores válidos para as porcentagens.", text_color="red")
+                        return
+                else:
+                    salvar_lancamento_em_excel("Despesa", valor, categoria, prédio_selecionado, " ", 0, mes_usuario)
+                    label_status_lancamento.configure(
+                        text=f"Despesa de R${valor} na categoria '{categoria}', no prédio {prédio_selecionado} registrada!",
+                        text_color="green"
+                    )
 
         ctk.CTkButton(frame_conteudo, text="Registrar Despesa", command=salvar_despesa).pack(pady=10)
 
         label_status_lancamento = ctk.CTkLabel(frame_conteudo, text="", font=("Arial", 12))
         label_status_lancamento.pack(pady=5)
+
 
 
     elif tipo == "lancar_receitas":
